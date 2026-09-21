@@ -25,6 +25,7 @@ export const Module2Asistencia: React.FC = () => {
     selectedFechaAsistencia,
     setSelectedFechaAsistencia,
     maxAbsencesThreshold,
+    setActiveTab,
   } = useSchool();
 
   // Active course for attendance (must be a valid single course)
@@ -109,6 +110,30 @@ export const Module2Asistencia: React.FC = () => {
     });
     return Array.from(dates).sort().reverse();
   }, [alumnosCurso, asistencias]);
+
+  if (grupos.length === 0) {
+    return (
+      <div className="space-y-6">
+        <div className="bg-white p-8 sm:p-12 rounded-2xl border border-dashed border-slate-300 text-center space-y-4">
+          <div className="w-14 h-14 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center mx-auto shadow-2xs">
+            <CalendarCheck className="w-7 h-7" />
+          </div>
+          <div className="max-w-md mx-auto">
+            <h3 className="text-base font-bold text-slate-900">No hay cursos creados para registrar asistencia</h3>
+            <p className="text-xs text-slate-500 mt-1 leading-relaxed">
+              La base de datos se encuentra en estado inicial limpio. Para registrar el control diario de presencias y ausencias, primero debes crear al menos un curso o grupo académico en el Módulo 1.
+            </p>
+          </div>
+          <button
+            onClick={() => setActiveTab('cursos_alumnos')}
+            className="inline-flex items-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold shadow-xs transition-colors cursor-pointer"
+          >
+            Ir a Crear Cursos y Alumnos →
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">

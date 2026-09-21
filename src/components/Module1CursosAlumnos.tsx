@@ -201,99 +201,120 @@ export const Module1CursosAlumnos: React.FC = () => {
           </span>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {grupos.map((grupo) => {
-            const countAlumnos = alumnos.filter((a) => a.id_curso === grupo.id_curso).length;
-            const isSelected = selectedCursoId === grupo.id_curso;
+        {grupos.length === 0 ? (
+          <div className="bg-white rounded-2xl border border-dashed border-slate-300 p-8 text-center space-y-3">
+            <div className="w-12 h-12 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center mx-auto">
+              <BookOpen className="w-6 h-6" />
+            </div>
+            <div className="max-w-md mx-auto">
+              <h4 className="text-sm font-bold text-slate-800">No hay cursos ni asignaturas registradas</h4>
+              <p className="text-xs text-slate-500 mt-1">
+                La base de datos se encuentra en estado inicial limpio. Da de alta la primera asignatura técnica para comenzar a registrar contenidos y alumnos.
+              </p>
+            </div>
+            <button
+              onClick={handleOpenNewGrupo}
+              className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold shadow-xs transition-colors cursor-pointer"
+            >
+              <Plus className="w-4 h-4" />
+              Crear Primer Curso / Grupo
+            </button>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {grupos.map((grupo) => {
+              const countAlumnos = alumnos.filter((a) => a.id_curso === grupo.id_curso).length;
+              const isSelected = selectedCursoId === grupo.id_curso;
 
-            return (
-              <div
-                key={grupo.id_curso}
-                className={`relative p-4 rounded-xl border transition-all duration-200 bg-white ${
-                  isSelected
-                    ? 'border-blue-500 ring-2 ring-blue-500/20 shadow-md'
-                    : 'border-slate-200 hover:border-slate-300 shadow-xs'
-                }`}
-              >
-                <div className="flex items-start justify-between gap-2">
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-mono font-bold px-2 py-0.5 rounded bg-slate-100 text-slate-700">
-                      ID #{grupo.id_curso}
-                    </span>
-                    <span className="text-xs px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 font-semibold border border-blue-200/60">
-                      {countAlumnos} {countAlumnos === 1 ? 'estudiante' : 'estudiantes'}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <button
-                      onClick={() => handleOpenEditGrupo(grupo)}
-                      className="p-1 text-slate-400 hover:text-blue-600 rounded transition-colors"
-                      title="Editar curso"
-                    >
-                      <Edit2 className="w-3.5 h-3.5" />
-                    </button>
-                    <button
-                      onClick={() => setConfirmDeleteGrupoId(grupo.id_curso)}
-                      className="p-1 text-slate-400 hover:text-rose-600 rounded transition-colors"
-                      title="Eliminar curso"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                </div>
-
-                <h4 className="font-bold text-slate-900 mt-2 text-sm leading-snug">
-                  {grupo.nombre_curso}
-                </h4>
-                <p className="text-xs text-slate-600 mt-1 line-clamp-2 leading-relaxed">
-                  {grupo.descripcion || 'Sin descripción especificada.'}
-                </p>
-
-                {/* Filter shortcut */}
-                <div className="mt-3 pt-2.5 border-t border-slate-100 flex items-center justify-between">
-                  <button
-                    onClick={() => setSelectedCursoId(isSelected ? 'all' : grupo.id_curso)}
-                    className={`text-xs font-medium transition-colors ${
-                      isSelected
-                        ? 'text-blue-600 font-semibold'
-                        : 'text-slate-500 hover:text-slate-800'
-                    }`}
-                  >
-                    {isSelected ? '✓ Filtrando nómina' : 'Filtrar alumnos →'}
-                  </button>
-                </div>
-
-                {/* Confirm Delete Popup */}
-                {confirmDeleteGrupoId === grupo.id_curso && (
-                  <div className="absolute inset-0 bg-white/95 backdrop-blur-xs rounded-xl p-4 flex flex-col justify-center items-center text-center z-10">
-                    <AlertCircle className="w-8 h-8 text-rose-500 mb-1" />
-                    <p className="text-xs font-bold text-slate-800">¿Eliminar este curso?</p>
-                    <p className="text-[11px] text-slate-500 mb-3">
-                      Los alumnos asignados quedarán sin grupo (id_curso = null).
-                    </p>
-                    <div className="flex gap-2">
+              return (
+                <div
+                  key={grupo.id_curso}
+                  className={`relative p-4 rounded-xl border transition-all duration-200 bg-white ${
+                    isSelected
+                      ? 'border-blue-500 ring-2 ring-blue-500/20 shadow-md'
+                      : 'border-slate-200 hover:border-slate-300 shadow-xs'
+                  }`}
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-mono font-bold px-2 py-0.5 rounded bg-slate-100 text-slate-700">
+                        ID #{grupo.id_curso}
+                      </span>
+                      <span className="text-xs px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 font-semibold border border-blue-200/60">
+                        {countAlumnos} {countAlumnos === 1 ? 'estudiante' : 'estudiantes'}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1">
                       <button
-                        onClick={() => setConfirmDeleteGrupoId(null)}
-                        className="px-2.5 py-1 text-xs bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200"
+                        onClick={() => handleOpenEditGrupo(grupo)}
+                        className="p-1 text-slate-400 hover:text-blue-600 rounded transition-colors"
+                        title="Editar curso"
                       >
-                        Cancelar
+                        <Edit2 className="w-3.5 h-3.5" />
                       </button>
                       <button
-                        onClick={() => {
-                          deleteGrupo(grupo.id_curso);
-                          setConfirmDeleteGrupoId(null);
-                        }}
-                        className="px-2.5 py-1 text-xs bg-rose-600 text-white font-medium rounded-lg hover:bg-rose-700"
+                        onClick={() => setConfirmDeleteGrupoId(grupo.id_curso)}
+                        className="p-1 text-slate-400 hover:text-rose-600 rounded transition-colors"
+                        title="Eliminar curso"
                       >
-                        Sí, eliminar
+                        <Trash2 className="w-3.5 h-3.5" />
                       </button>
                     </div>
                   </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
+
+                  <h4 className="font-bold text-slate-900 mt-2 text-sm leading-snug">
+                    {grupo.nombre_curso}
+                  </h4>
+                  <p className="text-xs text-slate-600 mt-1 line-clamp-2 leading-relaxed">
+                    {grupo.descripcion || 'Sin descripción especificada.'}
+                  </p>
+
+                  {/* Filter shortcut */}
+                  <div className="mt-3 pt-2.5 border-t border-slate-100 flex items-center justify-between">
+                    <button
+                      onClick={() => setSelectedCursoId(isSelected ? 'all' : grupo.id_curso)}
+                      className={`text-xs font-medium transition-colors ${
+                        isSelected
+                          ? 'text-blue-600 font-semibold'
+                          : 'text-slate-500 hover:text-slate-800'
+                      }`}
+                    >
+                      {isSelected ? '✓ Filtrando nómina' : 'Filtrar alumnos →'}
+                    </button>
+                  </div>
+
+                  {/* Confirm Delete Popup */}
+                  {confirmDeleteGrupoId === grupo.id_curso && (
+                    <div className="absolute inset-0 bg-white/95 backdrop-blur-xs rounded-xl p-4 flex flex-col justify-center items-center text-center z-10">
+                      <AlertCircle className="w-8 h-8 text-rose-500 mb-1" />
+                      <p className="text-xs font-bold text-slate-800">¿Eliminar este curso?</p>
+                      <p className="text-[11px] text-slate-500 mb-3">
+                        Los alumnos asignados quedarán sin grupo (id_curso = null).
+                      </p>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => setConfirmDeleteGrupoId(null)}
+                          className="px-2.5 py-1 text-xs bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200"
+                        >
+                          Cancelar
+                        </button>
+                        <button
+                          onClick={() => {
+                            deleteGrupo(grupo.id_curso);
+                            setConfirmDeleteGrupoId(null);
+                          }}
+                          className="px-2.5 py-1 text-xs bg-rose-600 text-white font-medium rounded-lg hover:bg-rose-700"
+                        >
+                          Sí, eliminar
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {/* SECTION 2: Nómina de Alumnos */}
@@ -374,10 +395,29 @@ export const Module1CursosAlumnos: React.FC = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 text-slate-700">
-                {filteredAlumnos.length === 0 ? (
+                {alumnos.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} className="py-12 text-center text-slate-500">
+                      <div className="max-w-sm mx-auto space-y-2">
+                        <Users className="w-8 h-8 text-slate-300 mx-auto" />
+                        <p className="font-semibold text-slate-700 text-sm">No hay estudiantes registrados</p>
+                        <p className="text-xs text-slate-400">
+                          La nómina escolar está limpia. Inscribe a tu primer estudiante técnico para comenzar.
+                        </p>
+                        <button
+                          onClick={handleOpenNewAlumno}
+                          className="mt-2 inline-flex items-center gap-1.5 px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold shadow-xs transition-colors cursor-pointer"
+                        >
+                          <Plus className="w-3.5 h-3.5" />
+                          + Inscribir Primer Alumno
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ) : filteredAlumnos.length === 0 ? (
                   <tr>
                     <td colSpan={5} className="py-8 text-center text-slate-400">
-                      No se encontraron alumnos con los criterios seleccionados.
+                      No se encontraron alumnos con los criterios de búsqueda seleccionados.
                     </td>
                   </tr>
                 ) : (

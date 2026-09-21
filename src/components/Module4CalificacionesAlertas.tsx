@@ -31,6 +31,7 @@ export const Module4CalificacionesAlertas: React.FC = () => {
     deleteNota,
     selectedCursoId,
     setSelectedCursoId,
+    setActiveTab,
   } = useSchool();
 
   // Active subtab: 'resumen_global' vs 'registro_notas'
@@ -363,7 +364,25 @@ export const Module4CalificacionesAlertas: React.FC = () => {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {filteredResumen.length === 0 ? (
+                  {alumnos.length === 0 ? (
+                    <tr>
+                      <td colSpan={8} className="py-12 text-center text-slate-500">
+                        <div className="max-w-sm mx-auto space-y-2">
+                          <GraduationCap className="w-8 h-8 text-slate-300 mx-auto" />
+                          <p className="font-semibold text-slate-700 text-sm">No hay estudiantes registrados</p>
+                          <p className="text-xs text-slate-400">
+                            La base de datos se encuentra limpia. Registra estudiantes en el Módulo 1 para habilitar el cálculo de promedios, inasistencias y alertas automáticas.
+                          </p>
+                          <button
+                            onClick={() => setActiveTab('cursos_alumnos')}
+                            className="mt-2 inline-flex items-center gap-1.5 px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold shadow-xs transition-colors cursor-pointer"
+                          >
+                            Ir a Registrar Cursos y Alumnos →
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ) : filteredResumen.length === 0 ? (
                     <tr>
                       <td colSpan={8} className="py-8 text-center text-slate-400">
                         No hay estudiantes que coincidan con los filtros aplicados.

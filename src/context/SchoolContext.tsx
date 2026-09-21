@@ -17,9 +17,25 @@ import {
   INITIAL_TEMARIOS,
   INITIAL_DESEMPENOS,
   INITIAL_NOTAS,
+  DEMO_GRUPOS,
+  DEMO_ALUMNOS,
+  DEMO_ASISTENCIAS,
+  DEMO_TEMARIOS,
+  DEMO_DESEMPENOS,
+  DEMO_NOTAS,
 } from '../data/initialData';
 
 interface SchoolContextType {
+  // Authentication
+  isAuthenticated: boolean;
+  currentUser: string | null;
+  login: (user: string, pass: string) => boolean;
+  logout: () => void;
+
+  // Cloud Database configuration
+  databaseUrl: string;
+  setDatabaseUrl: (url: string) => void;
+
   // Active Tab
   activeTab: TabKey;
   setActiveTab: (tab: TabKey) => void;
@@ -77,16 +93,64 @@ interface SchoolContextType {
   totalAlumnosEnRiesgo: number;
   promedioGeneralInstitucional: number;
 
-  // Reset & Export
+  // Reset, Clear & Export
+  clearAllData: () => void;
+  loadDemoData: () => void;
   resetToDefaults: () => void;
   generatePostgreSQLScript: () => string;
 }
 
-const LOCAL_STORAGE_KEY = 'gestion_escolar_data_v1';
+const LOCAL_STORAGE_KEY = 'gestion_escolar_v2_clean';
+const AUTH_SESSION_KEY = 'gestion_escolar_auth_session';
 
 const SchoolContext = createContext<SchoolContextType | undefined>(undefined);
 
 export const SchoolProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+  // Authentication state - starts locked by default
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
+    try {
+      return sessionStorage.getItem(AUTH_SESSION_KEY) === 'true';
+    } catch {
+      return false;
+    }
+  });
+  const [currentUser, setCurrentUser] = useState<string | null>(() => {
+    return isAuthenticated ? 'admin' : null;
+  });
+
+  const login = (user: string, pass: string): boolean => {
+    if (user.trim() === 'admin' && pass === 'Brasil.2026') {
+      setIsAuthenticated(true);
+      setCurrentUser('admin');
+      try {
+        sessionStorage.setItem(AUTH_SESSION_KEY, 'true');
+      } catch {
+        // Ignore session storage error
+      }
+      return true;
+    }
+    return false;
+  };
+
+  const logout = () => {
+    setIsAuthenticated(false);
+    setCurrentUser(null);
+    try {
+      sessionStorage.removeItem(AUTH_SESSION_KEY);
+    } catch {
+      // Ignore
+    }
+  };
+
+  // Cloud Database URL State
+  const [databaseUrl, setDatabaseUrl] = useState<string>(() => {
+    try {
+      return localStorage.getItem(`${LOCAL_STORAGE_KEY}_db_url`) || '';
+    } catch {
+      return '';
+    }
+  });
+
   const [activeTab, setActiveTab] = useState<TabKey>('cursos_alumnos');
   const [maxAbsencesThreshold, setMaxAbsencesThreshold] = useState<number>(5);
 
@@ -95,7 +159,7 @@ export const SchoolProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     return new Date().toISOString().split('T')[0];
   });
 
-  // Table states with persistence
+  // Table states with persistence (defaulting to clean empty templates)
   const [grupos, setGrupos] = useState<Grupo[]>(() => {
     try {
       const saved = localStorage.getItem(`${LOCAL_STORAGE_KEY}_grupos`);
@@ -160,10 +224,13 @@ export const SchoolProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       localStorage.setItem(`${LOCAL_STORAGE_KEY}_desempenos`, JSON.stringify(desempenos));
       localStorage.setItem(`${LOCAL_STORAGE_KEY}_notas`, JSON.stringify(notas));
       localStorage.setItem(`${LOCAL_STORAGE_KEY}_max_absences`, JSON.stringify(maxAbsencesThreshold));
+      if (databaseUrl) {
+        localStorage.setItem(`${LOCAL_STORAGE_KEY}_db_url`, databaseUrl);
+      }
     } catch (e) {
       console.error('Error saving to localStorage', e);
     }
-  }, [grupos, alumnos, asistencias, temarios, desempenos, notas, maxAbsencesThreshold]);
+  }, [grupos, alumnos, asistencias, temarios, desempenos, notas, maxAbsencesThreshold, databaseUrl]);
 
   // Load saved threshold on mount
   useEffect(() => {
@@ -262,9 +329,7 @@ export const SchoolProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     const alumnoIds = new Set(courseAlumnos.map((a) => a.id_alumno));
 
     setAsistencias((prev) => {
-      // Remove previous records for these students on that date
       const others = prev.filter((item) => !(alumnoIds.has(item.id_alumno) && item.fecha === fecha));
-      // Add updated records
       const newItems: Asistencia[] = courseAlumnos.map((a) => ({
         id_alumno: a.id_alumno,
         fecha,
@@ -418,33 +483,50 @@ export const SchoolProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     );
   }, [resumenAlumnos]);
 
-  // Reset to default sample data
-  const resetToDefaults = () => {
-    setGrupos(INITIAL_GRUPOS);
-    setAlumnos(INITIAL_ALUMNOS);
-    setAsistencias(INITIAL_ASISTENCIAS);
-    setTemarios(INITIAL_TEMARIOS);
-    setDesempenos(INITIAL_DESEMPENOS);
-    setNotas(INITIAL_NOTAS);
+  // Clean Slate: Reset to 100% empty state (no courses, no students)
+  const clearAllData = () => {
+    setGrupos([]);
+    setAlumnos([]);
+    setAsistencias([]);
+    setTemarios([]);
+    setDesempenos([]);
+    setNotas([]);
+    setSelectedCursoId('all');
     setMaxAbsencesThreshold(5);
   };
 
-  // Generate full PostgreSQL DDL + INSERT script
+  // Optional: Load sample demo data for quick review
+  const loadDemoData = () => {
+    setGrupos(DEMO_GRUPOS);
+    setAlumnos(DEMO_ALUMNOS);
+    setAsistencias(DEMO_ASISTENCIAS);
+    setTemarios(DEMO_TEMARIOS);
+    setDesempenos(DEMO_DESEMPENOS);
+    setNotas(DEMO_NOTAS);
+    setSelectedCursoId('all');
+    setMaxAbsencesThreshold(5);
+  };
+
+  const resetToDefaults = clearAllData;
+
+  // Generate full PostgreSQL DDL + optional data script
   const generatePostgreSQLScript = (): string => {
+    const hasData = grupos.length > 0 || alumnos.length > 0;
+
     return `-- ==========================================================
 -- GESTIÓN ESCOLAR INTEGRAL - ESQUEMA DE BASE DE DATOS POSTGRESQL
 -- Compatible con: Supabase, Neon, Vercel Postgres, PostgreSQL 14+
--- Generado automáticamente desde la aplicación
+-- Conexión Cloud: DATABASE_URL="postgresql://...sslmode=require"
 -- ==========================================================
 
--- 1. TABLA: Grupo (Cursos / Asignaturas)
+-- 1. TABLA: Grupo (Cursos / Asignaturas Técnicas)
 CREATE TABLE IF NOT EXISTS "Grupo" (
     "id_curso" SERIAL PRIMARY KEY,
     "nombre_curso" VARCHAR(255) NOT NULL,
     "descripcion" TEXT
 );
 
--- 2. TABLA: Alumnos (Estudiantes)
+-- 2. TABLA: Alumnos (Estudiantes Técnicos)
 CREATE TABLE IF NOT EXISTS "Alumnos" (
     "id_alumno" SERIAL PRIMARY KEY,
     "nombre" VARCHAR(100) NOT NULL,
@@ -453,7 +535,7 @@ CREATE TABLE IF NOT EXISTS "Alumnos" (
     "certificado" BOOLEAN DEFAULT false NOT NULL
 );
 
--- 3. TABLA: Asistencia (Control Diario)
+-- 3. TABLA: Asistencia (Control Diario de Presencias)
 -- Primary Key Compuesta: (id_alumno, fecha)
 CREATE TABLE IF NOT EXISTS "Asistencia" (
     "id_alumno" INTEGER NOT NULL REFERENCES "Alumnos"("id_alumno") ON DELETE CASCADE,
@@ -462,7 +544,7 @@ CREATE TABLE IF NOT EXISTS "Asistencia" (
     PRIMARY KEY ("id_alumno", "fecha")
 );
 
--- 4. TABLA: Temario_Dia (Planificación Académica)
+-- 4. TABLA: Temario_Dia (Planificación Académica y Contenidos)
 CREATE TABLE IF NOT EXISTS "Temario_Dia" (
     "id_temario" SERIAL PRIMARY KEY,
     "fecha" DATE NOT NULL,
@@ -473,15 +555,8 @@ CREATE TABLE IF NOT EXISTS "Temario_Dia" (
     "recursos" TEXT
 );
 
--- 5. TABLA: Desempeno_Clase (Checklist de Participación)
+-- 5. TABLA: Desempeno_Clase (Checklist de Participación Individual)
 -- Primary Key Compuesta: (id_temario, id_alumno)
-DO $$
-BEGIN
-    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'estado_desempeno_enum') THEN
-        CREATE TYPE estado_desempeno_enum AS ENUM ('Excelente', 'Bueno', 'Regular', 'Necesita Refuerzo');
-    END IF;
-END$$;
-
 CREATE TABLE IF NOT EXISTS "Desempeno_Clase" (
     "id_temario" INTEGER NOT NULL REFERENCES "Temario_Dia"("id_temario") ON DELETE CASCADE,
     "id_alumno" INTEGER NOT NULL REFERENCES "Alumnos"("id_alumno") ON DELETE CASCADE,
@@ -489,7 +564,7 @@ CREATE TABLE IF NOT EXISTS "Desempeno_Clase" (
     PRIMARY KEY ("id_temario", "id_alumno")
 );
 
--- 6. TABLA: Notas (Calificaciones)
+-- 6. TABLA: Notas (Calificaciones Parciales y Prácticas)
 CREATE TABLE IF NOT EXISTS "Notas" (
     "id_nota" SERIAL PRIMARY KEY,
     "id_alumno" INTEGER NOT NULL REFERENCES "Alumnos"("id_alumno") ON DELETE CASCADE,
@@ -497,8 +572,16 @@ CREATE TABLE IF NOT EXISTS "Notas" (
     "nota" NUMERIC(4, 2) NOT NULL CHECK ("nota" >= 0.00 AND "nota" <= 10.00)
 );
 
--- ==========================================================
--- INSERCIÓN DE DATOS ACTUALES DEL SISTEMA (SEEDS / SNAPSHOT)
+-- Índices recomendados para consultas analíticas de alto rendimiento
+CREATE INDEX IF NOT EXISTS "idx_alumnos_curso" ON "Alumnos"("id_curso");
+CREATE INDEX IF NOT EXISTS "idx_asistencia_fecha" ON "Asistencia"("fecha");
+CREATE INDEX IF NOT EXISTS "idx_temario_curso_fecha" ON "Temario_Dia"("id_curso", "fecha");
+CREATE INDEX IF NOT EXISTS "idx_notas_alumno" ON "Notas"("id_alumno");
+
+${
+  hasData
+    ? `-- ==========================================================
+-- INSERCIÓN DE DATOS REGISTRADOS EN EL SISTEMA
 -- ==========================================================
 
 -- Insertar Cursos / Grupos
@@ -548,12 +631,25 @@ ${notas
       `INSERT INTO "Notas" ("id_nota", "id_alumno", "tipo_evaluacion", "nota") VALUES (${n.id_nota}, ${n.id_alumno}, '${n.tipo_evaluacion.replace(/'/g, "''")}', ${n.nota.toFixed(2)}) ON CONFLICT ("id_nota") DO UPDATE SET "tipo_evaluacion" = EXCLUDED."tipo_evaluacion", "nota" = EXCLUDED."nota";`
   )
   .join('\n')}
-`;
+`
+    : `-- ==========================================================
+-- PLANTILLA INICIAL VACÍA:
+-- Las 6 tablas han sido creadas limpias y sin registros precargados.
+-- El sistema está listo para registrar Cursos, Alumnos y Evaluaciones.
+-- ==========================================================
+`
+}`;
   };
 
   return (
     <SchoolContext.Provider
       value={{
+        isAuthenticated,
+        currentUser,
+        login,
+        logout,
+        databaseUrl,
+        setDatabaseUrl,
         activeTab,
         setActiveTab,
         maxAbsencesThreshold,
@@ -589,6 +685,8 @@ ${notas
         resumenAlumnos,
         totalAlumnosEnRiesgo,
         promedioGeneralInstitucional,
+        clearAllData,
+        loadDemoData,
         resetToDefaults,
         generatePostgreSQLScript,
       }}

@@ -31,6 +31,7 @@ export const Module3TemarioDesempeno: React.FC = () => {
     getDesempeno,
     selectedCursoId,
     setSelectedCursoId,
+    setActiveTab,
   } = useSchool();
 
   // Active course
@@ -181,6 +182,30 @@ export const Module3TemarioDesempeno: React.FC = () => {
 
     return counts;
   }, [desempenosCurrentClass]);
+
+  if (grupos.length === 0) {
+    return (
+      <div className="space-y-6">
+        <div className="bg-white p-8 sm:p-12 rounded-2xl border border-dashed border-slate-300 text-center space-y-4">
+          <div className="w-14 h-14 rounded-2xl bg-violet-50 text-violet-600 flex items-center justify-center mx-auto shadow-2xs">
+            <ClipboardList className="w-7 h-7" />
+          </div>
+          <div className="max-w-md mx-auto">
+            <h3 className="text-base font-bold text-slate-900">No hay cursos para planificar clases</h3>
+            <p className="text-xs text-slate-500 mt-1 leading-relaxed">
+              La base de datos se encuentra limpia. Primero crea una asignatura o curso para poder registrar unidades temáticas, objetivos, recursos y evaluar el desempeño de los alumnos.
+            </p>
+          </div>
+          <button
+            onClick={() => setActiveTab('cursos_alumnos')}
+            className="inline-flex items-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold shadow-xs transition-colors cursor-pointer"
+          >
+            Ir a Crear Cursos y Alumnos →
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
