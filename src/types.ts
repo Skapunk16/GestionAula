@@ -56,6 +56,7 @@ export interface Nota {
 // UI Navigation Tabs
 export type TabKey =
   | 'cursos_alumnos'
+  | 'lista_estudiantes'
   | 'asistencia'
   | 'temario_desempeno'
   | 'calificaciones_alertas'

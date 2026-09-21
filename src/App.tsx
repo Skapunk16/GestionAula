@@ -5,6 +5,7 @@ import { LoginView } from './components/LoginView';
 import { Header } from './components/Header';
 import { Navigation } from './components/Navigation';
 import { Module1CursosAlumnos } from './components/Module1CursosAlumnos';
+import { ModuleListaEstudiantes } from './components/ModuleListaEstudiantes';
 import { Module2Asistencia } from './components/Module2Asistencia';
 import { Module3TemarioDesempeno } from './components/Module3TemarioDesempeno';
 import { Module4CalificacionesAlertas } from './components/Module4CalificacionesAlertas';
@@ -18,6 +19,7 @@ const MainContent: React.FC = () => {
   return (
     <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
       {activeTab === 'cursos_alumnos' && <Module1CursosAlumnos />}
+      {activeTab === 'lista_estudiantes' && <ModuleListaEstudiantes />}
       {activeTab === 'asistencia' && <Module2Asistencia />}
       {activeTab === 'temario_desempeno' && <Module3TemarioDesempeno />}
       {activeTab === 'calificaciones_alertas' && <Module4CalificacionesAlertas />}

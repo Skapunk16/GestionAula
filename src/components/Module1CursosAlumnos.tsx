@@ -26,6 +26,8 @@ export const Module1CursosAlumnos: React.FC = () => {
     updateAlumno,
     deleteAlumno,
     downloadStudentReport,
+    downloadStudentsListReport,
+    setActiveTab,
     selectedCursoId,
     setSelectedCursoId,
   } = useSchool();
@@ -356,6 +358,35 @@ export const Module1CursosAlumnos: React.FC = () => {
                 </option>
               ))}
             </select>
+
+            {/* Descargar Lista en PDF */}
+            <button
+              type="button"
+              onClick={() =>
+                downloadStudentsListReport({
+                  cursoId: selectedCursoId,
+                  searchQuery: searchQuery.trim(),
+                  customAlumnosList: filteredAlumnos,
+                })
+              }
+              disabled={filteredAlumnos.length === 0}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold shadow-2xs transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+              title="Descargar la lista filtrada de estudiantes en formato PDF"
+            >
+              <FileDown className="w-3.5 h-3.5" />
+              <span>Descargar Lista PDF</span>
+            </button>
+
+            {/* Ver Padrón Completo */}
+            <button
+              type="button"
+              onClick={() => setActiveTab('lista_estudiantes')}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold border border-slate-200 transition-colors cursor-pointer"
+              title="Ir a la sección completa de Lista de Estudiantes con opciones avanzadas de PDF"
+            >
+              <FileText className="w-3.5 h-3.5 text-slate-600" />
+              <span>Ver Padrón</span>
+            </button>
           </div>
         </div>
 

@@ -9,6 +9,7 @@ import {
   Database,
   AlertCircle,
   ShieldCheck,
+  FileText,
 } from 'lucide-react';
 
 interface TabItem {
@@ -29,6 +30,12 @@ export const Navigation: React.FC = () => {
       label: 'Cursos y Estudiantes',
       moduleBadge: 'Módulo 1',
       icon: Users,
+    },
+    {
+      key: 'lista_estudiantes',
+      label: 'Lista de Estudiantes',
+      moduleBadge: 'Nómina PDF',
+      icon: FileText,
     },
     {
       key: 'asistencia',

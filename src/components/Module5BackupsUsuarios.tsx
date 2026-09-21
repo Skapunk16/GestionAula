@@ -187,28 +187,6 @@ export const Module5BackupsUsuarios: React.FC = () => {
         </div>
       </div>
 
-      {/* Security notice for Docentes: User Management is strictly SuperAdmin */}
-      {!isSuperAdmin && (
-        <div className="p-4 rounded-xl bg-amber-50/90 border border-amber-200 text-xs text-amber-900 flex items-start gap-3 shadow-xs">
-          <div className="p-2 rounded-lg bg-amber-100 text-amber-800 shrink-0">
-            <Lock className="w-4 h-4" />
-          </div>
-          <div className="space-y-1">
-            <div className="flex items-center gap-2">
-              <span className="font-bold text-amber-950 text-sm">
-                Panel de Administración de Usuarios Restringido
-              </span>
-              <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-200/80 text-amber-900">
-                Solo SuperAdmin
-              </span>
-            </div>
-            <p className="text-amber-800 leading-relaxed">
-              El acceso para registrar, eliminar o alternar usuarios del sistema está reservado únicamente para el <strong>Administrador General (SuperAdmin)</strong>. Tu cuenta docente tiene habilitado el acceso completo a <strong>tus propias copias de seguridad</strong> (creación manual, descarga de archivo JSON, restauración e importación) y personalización visual.
-            </p>
-          </div>
-        </div>
-      )}
-
       {/* Notice Message if any */}
       {importNotice && (
         <div

@@ -26,7 +26,7 @@ import {
   DEMO_DESEMPENOS,
   DEMO_NOTAS,
 } from '../data/initialData';
-import { generateStudentReportPDF } from '../utils/pdfGenerator';
+import { generateStudentReportPDF, generateStudentsListPDF, StudentsListPDFOptions } from '../utils/pdfGenerator';
 
 interface SchoolContextType {
   // Authentication & Multi-User
@@ -78,6 +78,12 @@ interface SchoolContextType {
   updateAlumno: (id_alumno: number, nombre: string, apellido: string, id_curso: number | null) => void;
   deleteAlumno: (id_alumno: number) => void;
   downloadStudentReport: (id_alumno: number) => void;
+  downloadStudentsListReport: (options?: {
+    cursoId?: number | 'all';
+    searchQuery?: string;
+    formato?: 'academico' | 'firmas_asistencia';
+    customAlumnosList?: Alumno[];
+  }) => void;
 
   // Asistencia actions
   setAsistencia: (id_alumno: number, fecha: string, asistio: boolean) => void;
@@ -608,6 +614,47 @@ export const SchoolProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       desempenos: studentDesempenos,
       temarios,
       maxAbsencesThreshold,
+    });
+  };
+
+  // Descargar Nómina / Padrón General de Estudiantes en PDF
+  const downloadStudentsListReport = (options?: {
+    cursoId?: number | 'all';
+    searchQuery?: string;
+    formato?: 'academico' | 'firmas_asistencia';
+    customAlumnosList?: Alumno[];
+  }) => {
+    const cursoId = options?.cursoId !== undefined ? options.cursoId : selectedCursoId;
+    const formato = options?.formato || 'academico';
+    const query = (options?.searchQuery || '').trim().toLowerCase();
+
+    let targetAlumnos = options?.customAlumnosList ? [...options.customAlumnosList] : [...alumnos];
+
+    if (!options?.customAlumnosList) {
+      if (cursoId !== 'all') {
+        targetAlumnos = targetAlumnos.filter((a) => a.id_curso === cursoId);
+      }
+      if (query) {
+        targetAlumnos = targetAlumnos.filter(
+          (a) =>
+            a.nombre.toLowerCase().includes(query) ||
+            a.apellido.toLowerCase().includes(query) ||
+            a.id_alumno.toString().includes(query)
+        );
+      }
+    }
+
+    const cursoFiltro = cursoId !== 'all' ? grupos.find((g) => g.id_curso === cursoId) || null : null;
+    const docenteNombre = currentUserProfile?.nombre || (currentUser ? `@${currentUser}` : 'Docente Titular');
+
+    generateStudentsListPDF({
+      alumnos: targetAlumnos,
+      grupos,
+      resumenAlumnos,
+      cursoFiltro,
+      docenteNombre,
+      formato,
+      criterioFiltroTexto: query ? `Búsqueda: "${query}"` : '',
     });
   };
 
@@ -1255,6 +1302,7 @@ ${notas
         updateAlumno,
         deleteAlumno,
         downloadStudentReport,
+        downloadStudentsListReport,
         setAsistencia,
         markBatchAsistencia,
         getAsistencia,
