@@ -27,6 +27,12 @@ import {
   Sun,
   Moon,
   Check,
+  Edit3,
+  Pencil,
+  KeyRound,
+  Eye,
+  EyeOff,
+  Save,
 } from 'lucide-react';
 
 export const Module5BackupsUsuarios: React.FC = () => {
@@ -37,6 +43,7 @@ export const Module5BackupsUsuarios: React.FC = () => {
     isSuperAdmin,
     setActiveTab,
     registerUser,
+    updateUser,
     deleteUser,
     switchUser,
     grupos,
@@ -63,6 +70,88 @@ export const Module5BackupsUsuarios: React.FC = () => {
   const [newNombre, setNewNombre] = useState('');
   const [newRol, setNewRol] = useState<UserRole>('Administrador');
   const [userError, setUserError] = useState('');
+
+  // Edit User & Credentials State (SuperAdmin ONLY)
+  const [selectedUserForEdit, setSelectedUserForEdit] = useState<AdminUser | null>(null);
+  const [editNombre, setEditNombre] = useState('');
+  const [editUsername, setEditUsername] = useState('');
+  const [editPassword, setEditPassword] = useState('');
+  const [editRol, setEditRol] = useState<UserRole>('Administrador');
+  const [editFirstLoginPending, setEditFirstLoginPending] = useState(false);
+  const [showEditPassword, setShowEditPassword] = useState(false);
+  const [showEditUserModal, setShowEditUserModal] = useState(false);
+  const [editError, setEditError] = useState('');
+  const [editSuccess, setEditSuccess] = useState('');
+
+  // Open Edit for a specific user
+  const handleStartEditUser = (user: AdminUser, openModal: boolean = false) => {
+    setSelectedUserForEdit(user);
+    setEditNombre(user.nombre);
+    setEditUsername(user.username);
+    setEditPassword('');
+    setEditRol(user.rol);
+    setEditFirstLoginPending(!!user.firstLoginPending);
+    setShowEditPassword(false);
+    setEditError('');
+    setEditSuccess('');
+    if (openModal) {
+      setShowEditUserModal(true);
+    }
+  };
+
+  // Submit User Edits
+  const handleSaveUserEdit = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!selectedUserForEdit) return;
+    setEditError('');
+    setEditSuccess('');
+
+    const cleanNombre = editNombre.trim();
+    const cleanUsername = editUsername.toLowerCase().trim();
+    const cleanPassword = editPassword.trim();
+
+    if (!cleanNombre) {
+      setEditError('El nombre del usuario no puede quedar vacío.');
+      return;
+    }
+    if (!cleanUsername || cleanUsername.length < 3) {
+      setEditError('El nombre de usuario debe contener al menos 3 caracteres.');
+      return;
+    }
+    if (cleanPassword && cleanPassword.length < 4) {
+      setEditError('La nueva contraseña debe tener al menos 4 caracteres.');
+      return;
+    }
+
+    const payload: Partial<Omit<AdminUser, 'id' | 'createdAt'>> = {
+      nombre: cleanNombre,
+      username: cleanUsername,
+      rol: editRol,
+      firstLoginPending: editFirstLoginPending,
+    };
+
+    if (cleanPassword) {
+      payload.password = cleanPassword;
+    }
+
+    const res = updateUser(selectedUserForEdit.id, payload);
+    if (res && !res.success) {
+      setEditError(res.message || 'Error al actualizar el usuario.');
+      return;
+    }
+
+    setEditSuccess(`¡Credenciales de ${cleanNombre} (@${cleanUsername}) actualizadas exitosamente!`);
+    setEditPassword('');
+    // Update the local selected user reference
+    setSelectedUserForEdit((prev) => (prev ? { ...prev, ...payload } : null));
+
+    if (showEditUserModal) {
+      setTimeout(() => {
+        setShowEditUserModal(false);
+        setEditSuccess('');
+      }, 1200);
+    }
+  };
 
   // Backup Manual Creation State
   const [showBackupModal, setShowBackupModal] = useState(false);
@@ -349,6 +438,16 @@ export const Module5BackupsUsuarios: React.FC = () => {
                     </td>
                     <td className="px-4 py-3.5 text-right">
                       <div className="flex items-center justify-end gap-2">
+                        {/* Edit Credentials Button (SuperAdmin) */}
+                        <button
+                          onClick={() => handleStartEditUser(u, true)}
+                          className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-700 text-xs font-semibold transition-colors cursor-pointer"
+                          title={`Editar nombre, usuario y contraseña de ${u.nombre}`}
+                        >
+                          <Pencil className="w-3.5 h-3.5 text-blue-600" />
+                          <span>Editar</span>
+                        </button>
+
                         {!isActive && (
                           <button
                             onClick={() => switchUser(u.username)}
@@ -356,7 +455,7 @@ export const Module5BackupsUsuarios: React.FC = () => {
                             title={`Cambiar a la base de datos de ${u.nombre}`}
                           >
                             <ArrowRightLeft className="w-3.5 h-3.5" />
-                            <span>Abrir Base de Datos</span>
+                            <span>Abrir Base</span>
                           </button>
                         )}
                         {users.length > 1 && !isActive && (
@@ -370,7 +469,7 @@ export const Module5BackupsUsuarios: React.FC = () => {
                                 deleteUser(u.id);
                               }
                             }}
-                            className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"
+                            className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
                             title="Eliminar usuario y su base de datos"
                           >
                             <Trash2 className="w-4 h-4" />
@@ -383,6 +482,236 @@ export const Module5BackupsUsuarios: React.FC = () => {
               })}
             </tbody>
           </table>
+        </div>
+
+        {/* SUBSECCIÓN DEDICADA: EDICIÓN DE USUARIOS Y CONTRASEÑAS (PERMISOS DE SUPERADMIN) */}
+        <div className="mt-6 pt-6 border-t border-slate-200/90 space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-lg bg-indigo-100 text-indigo-700 flex items-center justify-center">
+                <KeyRound className="w-4 h-4" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h4 className="text-sm font-bold text-slate-900">
+                    Sección de Edición de Usuarios y Contraseñas
+                  </h4>
+                  <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-200">
+                    Permisos de Superusuario
+                  </span>
+                </div>
+                <p className="text-xs text-slate-500">
+                  Modifique nombres completos, identificadores @username y redefina contraseñas institucionales.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* User selector chips */}
+          <div className="space-y-2">
+            <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider block">
+              Seleccionar usuario a gestionar:
+            </span>
+            <div className="flex flex-wrap gap-2">
+              {users.map((u) => {
+                const isSelected = selectedUserForEdit?.id === u.id;
+                return (
+                  <button
+                    key={u.id}
+                    type="button"
+                    onClick={() => handleStartEditUser(u, false)}
+                    className={`px-3 py-2 rounded-xl text-xs font-medium border transition-all flex items-center gap-2 cursor-pointer ${
+                      isSelected
+                        ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm'
+                        : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200'
+                    }`}
+                  >
+                    <div
+                      className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold ${
+                        isSelected ? 'bg-indigo-500 text-white' : 'bg-slate-200 text-slate-700'
+                      }`}
+                    >
+                      {u.nombre.charAt(0).toUpperCase()}
+                    </div>
+                    <span>{u.nombre}</span>
+                    <code
+                      className={`text-[11px] font-mono ${
+                        isSelected ? 'text-indigo-200' : 'text-slate-500'
+                      }`}
+                    >
+                      @{u.username}
+                    </code>
+                    {u.firstLoginPending && (
+                      <span className="w-2 h-2 rounded-full bg-amber-400" title="Primer login pendiente" />
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* User Editing Form Panel */}
+          {selectedUserForEdit ? (
+            <div className="p-5 rounded-xl border border-indigo-200 bg-indigo-50/20 space-y-4 animate-fadeIn">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between pb-3 border-b border-indigo-100 gap-2">
+                <div className="flex items-center gap-2">
+                  <Pencil className="w-4 h-4 text-indigo-600" />
+                  <span className="text-xs font-bold text-indigo-950">
+                    Editando credenciales de: <strong>{selectedUserForEdit.nombre}</strong> (@{selectedUserForEdit.username})
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedUserForEdit(null);
+                    setEditError('');
+                    setEditSuccess('');
+                  }}
+                  className="text-xs text-slate-500 hover:text-slate-700 underline cursor-pointer self-start sm:self-auto"
+                >
+                  Cerrar editor
+                </button>
+              </div>
+
+              {editError && (
+                <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 shrink-0 text-rose-600" />
+                  <p className="font-medium">{editError}</p>
+                </div>
+              )}
+
+              {editSuccess && (
+                <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-600" />
+                  <p className="font-medium">{editSuccess}</p>
+                </div>
+              )}
+
+              <form onSubmit={handleSaveUserEdit} className="space-y-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {/* Nombre Completo */}
+                  <div className="space-y-1">
+                    <label className="block text-xs font-semibold text-slate-700">
+                      Nombre Completo o Titular
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={editNombre}
+                      onChange={(e) => setEditNombre(e.target.value)}
+                      placeholder="Ej: Administrador General"
+                      className="w-full px-3 py-2 text-xs bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-slate-800"
+                    />
+                  </div>
+
+                  {/* Nombre de Usuario (@username) */}
+                  <div className="space-y-1">
+                    <label className="block text-xs font-semibold text-slate-700">
+                      Nombre de Usuario (@username)
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={editUsername}
+                      onChange={(e) => setEditUsername(e.target.value)}
+                      placeholder="minúsculas, ej: admin"
+                      className="w-full px-3 py-2 text-xs bg-white border border-slate-300 rounded-lg font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500 text-slate-800"
+                    />
+                    <p className="text-[11px] text-slate-500">
+                      Si se modifica el usuario, la partición de cursos y alumnos se migra automáticamente.
+                    </p>
+                  </div>
+
+                  {/* Rol del Sistema */}
+                  <div className="space-y-1">
+                    <label className="block text-xs font-semibold text-slate-700">
+                      Rol y Nivel de Privilegios
+                    </label>
+                    <select
+                      value={editRol}
+                      onChange={(e) => setEditRol(e.target.value as UserRole)}
+                      className="w-full px-3 py-2 text-xs bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-slate-800"
+                    >
+                      <option value="SuperAdmin">SuperAdmin (Acceso total)</option>
+                      <option value="Administrador">Administrador</option>
+                      <option value="Docente">Docente / Profesor</option>
+                    </select>
+                  </div>
+
+                  {/* Modificar / Restablecer Contraseña */}
+                  <div className="space-y-1">
+                    <label className="block text-xs font-semibold text-slate-700">
+                      Modificar / Restablecer Contraseña
+                    </label>
+                    <div className="relative">
+                      <input
+                        type={showEditPassword ? 'text' : 'password'}
+                        value={editPassword}
+                        onChange={(e) => setEditPassword(e.target.value)}
+                        placeholder="Dejar en blanco para mantener la contraseña actual"
+                        className="w-full pl-3 pr-10 py-2 text-xs bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-slate-800"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowEditPassword(!showEditPassword)}
+                        className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600"
+                        tabIndex={-1}
+                      >
+                        {showEditPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                      </button>
+                    </div>
+                    <p className="text-[11px] text-slate-500">
+                      {editPassword
+                        ? `Nueva contraseña de ${editPassword.length} caracteres lista para guardar.`
+                        : 'Contraseña actual conservada sin modificaciones.'}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Checkbox forzar primer inicio */}
+                <div className="flex items-center gap-2 pt-1">
+                  <input
+                    type="checkbox"
+                    id="chk-first-login"
+                    checked={editFirstLoginPending}
+                    onChange={(e) => setEditFirstLoginPending(e.target.checked)}
+                    className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 border-slate-300"
+                  />
+                  <label htmlFor="chk-first-login" className="text-xs text-slate-700 select-none cursor-pointer">
+                    Solicitar cambio de contraseña en el próximo inicio de sesión del usuario (bandera <code>firstLoginPending</code>)
+                  </label>
+                </div>
+
+                {/* Action Buttons */}
+                <div className="flex items-center justify-end gap-2 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedUserForEdit(null);
+                      setEditError('');
+                      setEditSuccess('');
+                    }}
+                    className="px-3 py-2 text-xs text-slate-600 hover:bg-slate-100 rounded-lg cursor-pointer"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="submit"
+                    className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg shadow-sm transition-colors cursor-pointer"
+                  >
+                    <Save className="w-3.5 h-3.5" />
+                    <span>Guardar Cambios de Credenciales</span>
+                  </button>
+                </div>
+              </form>
+            </div>
+          ) : (
+            <div className="p-4 rounded-xl border border-dashed border-slate-200 text-center text-xs text-slate-500 bg-slate-50/50">
+              <p>
+                Haga clic en cualquiera de los usuarios listados arriba o use el botón <strong>"Editar"</strong> en la tabla para actualizar sus datos y contraseñas.
+              </p>
+            </div>
+          )}
         </div>
       </div>
       )}
@@ -953,6 +1282,154 @@ export const Module5BackupsUsuarios: React.FC = () => {
                 Restaurar Base de Datos
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 4: EDITAR USUARIO Y CONTRASEÑA (SUPERADMIN) */}
+      {showEditUserModal && selectedUserForEdit && (
+        <div className="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl p-6 max-w-md w-full shadow-2xl border border-slate-200 animate-fadeIn space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div className="flex items-center gap-2 text-indigo-700">
+                <KeyRound className="w-5 h-5" />
+                <div>
+                  <h3 className="font-bold text-base text-slate-900">
+                    Editar Credenciales de Usuario
+                  </h3>
+                  <span className="text-[11px] font-mono text-indigo-600">
+                    @{selectedUserForEdit.username}
+                  </span>
+                </div>
+              </div>
+              <button
+                onClick={() => {
+                  setShowEditUserModal(false);
+                  setEditError('');
+                  setEditSuccess('');
+                }}
+                className="text-slate-400 hover:text-slate-600 text-lg leading-none"
+              >
+                ✕
+              </button>
+            </div>
+
+            {editError && (
+              <div className="p-3 rounded-lg bg-rose-50 border border-rose-200 text-rose-700 text-xs flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 shrink-0" />
+                <span>{editError}</span>
+              </div>
+            )}
+
+            {editSuccess && (
+              <div className="p-3 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 shrink-0" />
+                <span>{editSuccess}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleSaveUserEdit} className="space-y-3.5">
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  Nombre Completo / Titular
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={editNombre}
+                  onChange={(e) => setEditNombre(e.target.value)}
+                  className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  Nombre de Usuario (Login)
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={editUsername}
+                  onChange={(e) => setEditUsername(e.target.value)}
+                  className="w-full px-3 py-2 text-xs font-mono border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                />
+                <p className="text-[11px] text-slate-500 mt-1">
+                  La partición de cursos y alumnos se migra automáticamente.
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  Rol y Permisos
+                </label>
+                <select
+                  value={editRol}
+                  onChange={(e) => setEditRol(e.target.value as UserRole)}
+                  className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
+                >
+                  <option value="SuperAdmin">SuperAdmin (Acceso total y administración)</option>
+                  <option value="Administrador">Administrador</option>
+                  <option value="Docente">Docente / Profesor</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  Nueva Contraseña (Opcional)
+                </label>
+                <div className="relative">
+                  <input
+                    type={showEditPassword ? 'text' : 'password'}
+                    placeholder="Dejar en blanco para conservar actual"
+                    value={editPassword}
+                    onChange={(e) => setEditPassword(e.target.value)}
+                    className="w-full pl-3 pr-10 py-2 text-xs border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowEditPassword(!showEditPassword)}
+                    className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600"
+                    tabIndex={-1}
+                  >
+                    {showEditPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                  </button>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 pt-1">
+                <input
+                  type="checkbox"
+                  id="modal-first-login"
+                  checked={editFirstLoginPending}
+                  onChange={(e) => setEditFirstLoginPending(e.target.checked)}
+                  className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 border-slate-300"
+                />
+                <label htmlFor="modal-first-login" className="text-xs text-slate-700 select-none cursor-pointer">
+                  Exigir cambio de clave en próximo login
+                </label>
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowEditUserModal(false);
+                    setEditError('');
+                    setEditSuccess('');
+                  }}
+                  className="px-3.5 py-2 text-xs text-slate-600 hover:bg-slate-100 rounded-lg cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg shadow-sm cursor-pointer"
+                >
+                  <Save className="w-3.5 h-3.5" />
+                  <span>Guardar Cambios</span>
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

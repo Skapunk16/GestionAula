@@ -149,6 +149,29 @@ export const LoginView: React.FC = () => {
             </button>
           </form>
 
+          {/* Quick Default Credentials Card */}
+          <div className="pt-2 border-t border-slate-700/60">
+            <div className="p-3 rounded-xl bg-slate-900/70 border border-slate-700/70 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 text-xs">
+              <div className="text-slate-300">
+                <span className="text-[11px] text-slate-400 block font-medium">Credenciales iniciales:</span>
+                <span className="font-mono text-white">usuario: <strong className="text-amber-300">admin</strong></span>
+                <span className="mx-2 text-slate-600">•</span>
+                <span className="font-mono text-white">clave: <strong className="text-amber-300">admin</strong></span>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setUsername('admin');
+                  setPassword('admin');
+                }}
+                className="px-2.5 py-1 rounded-lg bg-indigo-950/80 hover:bg-indigo-900 border border-indigo-700/60 text-indigo-300 text-[11px] font-semibold transition-colors cursor-pointer self-start sm:self-auto"
+                title="Autocompletar credenciales predeterminadas"
+              >
+                Autocompletar
+              </button>
+            </div>
+          </div>
+
         </div>
 
         {/* Footer info */}

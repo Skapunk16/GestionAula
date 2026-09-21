@@ -73,6 +73,7 @@ export interface AdminUser {
   nombre: string;
   rol: UserRole;
   createdAt: string;
+  firstLoginPending?: boolean;
 }
 
 // Database Snapshot / Backup for Recovery

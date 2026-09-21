@@ -11,6 +11,33 @@
 
 ---
 
+### 🖥️ Vista Previa del Sistema
+
+![Dashboard Principal de Gestión Escolar](./docs/images/dashboard_preview.jpg)
+
+---
+
+## 🔑 Credenciales de Acceso Predeterminadas y Seguridad
+
+El sistema incluye cuentas iniciales preconfiguradas para pruebas y puesta en marcha:
+
+| Tipo de Cuenta | Usuario | Contraseña Inicial | Privilegios |
+| :--- | :--- | :--- | :--- |
+| **SuperAdmin** | `admin` | `admin` | **Acceso total**: gestión de cursos, alumnos, notas, particiones y edición de usuarios/contraseñas. |
+| **Docente Demo** | `docente` | `docente` | **Perfil docente**: gestión de sus propios cursos, asistencias y calificaciones. |
+
+> 🔒 **Cambio de Contraseña Obligatorio en el Primer Inicio:**
+> Al iniciar sesión por primera vez con el usuario `admin` (contraseña `admin`), el sistema despliega automáticamente una ventana modal obligatoria que exige cambiar la contraseña por una nueva y segura antes de operar.
+>
+> 🛡️ **Panel de Edición de Usuarios y Contraseñas (Permisos de Superusuario):**
+> Desde el módulo de **Panel SuperAdmin y Backups**, los usuarios con rol de SuperAdmin cuentan con una sección exclusiva donde pueden:
+> - Modificar el nombre completo y el identificador `@username` de cualquier cuenta.
+> - **Migración Transparente de Base de Datos:** Si se cambia un nombre de usuario, todas sus particiones escolares aisladas (cursos, estudiantes, asistencias y notas) se transfieren automáticamente al nuevo identificador.
+> - Reestablecer o definir una nueva contraseña directamente.
+> - Activar o desactivar la bandera `firstLoginPending` para exigir un nuevo cambio de clave en el próximo ingreso.
+
+---
+
 ## 📋 Tabla de Contenidos
 
 - [Descripción General](#-descripción-general)
@@ -98,6 +125,15 @@ Grilla exhaustiva de notas por estudiante con código de color en promedios, ina
 ![Módulo 4 - Grilla de Calificaciones](./docs/images/calificaciones_tabla.jpg)
 
 *Vista de Detalle: Seguimiento nominal por alumno con botones para registrar nuevas notas parciales y exportar el informe académico individual.*
+
+---
+
+### 7. Exportación y Generación de Reportes Oficiales en PDF
+Motor de exportación de documentos oficiales en formato vectorial A4 (apaisado y vertical) para actas de examen, nóminas de firmas para control de aula y fichas individuales de legajo:
+
+![Reportes Oficiales y Fichas PDF](./docs/images/reports_preview.jpg)
+
+*Formatos de exportación PDF: Nómina académica con promedios y planilla de firmas para asistencia física en evaluaciones y talleres.*
 
 ---
 

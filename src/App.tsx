@@ -11,6 +11,7 @@ import { Module3TemarioDesempeno } from './components/Module3TemarioDesempeno';
 import { Module4CalificacionesAlertas } from './components/Module4CalificacionesAlertas';
 import { ModuleSqlExport } from './components/ModuleSqlExport';
 import { Module5BackupsUsuarios } from './components/Module5BackupsUsuarios';
+import { FirstLoginPasswordModal } from './components/FirstLoginPasswordModal';
 import { CheckCircle2, AlertCircle } from 'lucide-react';
 
 const MainContent: React.FC = () => {
@@ -44,6 +45,9 @@ const SchoolApp: React.FC = () => {
     >
       <Header />
       <Navigation />
+
+      {/* First Login Password Change Modal */}
+      <FirstLoginPasswordModal />
 
       {/* Global System Notice Toast */}
       {systemNotice && (

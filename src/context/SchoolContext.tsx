@@ -35,10 +35,13 @@ interface SchoolContextType {
   currentUserProfile: AdminUser | null;
   isSuperAdmin: boolean;
   users: AdminUser[];
+  showFirstLoginModal: boolean;
+  setShowFirstLoginModal: (show: boolean) => void;
   login: (user: string, pass: string) => boolean;
   logout: () => void;
+  changeAdminPassword: (newPassword: string, newNombre?: string) => { success: boolean; message?: string };
   registerUser: (user: Omit<AdminUser, 'id' | 'createdAt'>) => { success: boolean; message?: string };
-  updateUser: (id: string, partial: Partial<Omit<AdminUser, 'id' | 'createdAt'>>) => void;
+  updateUser: (id: string, partial: Partial<Omit<AdminUser, 'id' | 'createdAt'>>) => { success: boolean; message?: string };
   deleteUser: (id: string) => { success: boolean; message?: string };
   switchUser: (username: string) => void;
 
@@ -137,10 +140,11 @@ const DEFAULT_USERS: AdminUser[] = [
   {
     id: 'user-admin-default',
     username: 'admin',
-    password: 'Brasil.2026',
+    password: 'admin',
     nombre: 'Administrador General',
     rol: 'SuperAdmin',
     createdAt: '2026-09-01T00:00:00.000Z',
+    firstLoginPending: true,
   },
 ];
 
@@ -157,8 +161,26 @@ export const SchoolProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     try {
       const saved = localStorage.getItem(USERS_STORAGE_KEY);
       if (saved) {
-        const parsed: AdminUser[] = JSON.parse(saved);
+        let parsed: AdminUser[] = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) {
+          // Normalize default admin: migrate any previous 'Brasil.2026' password to 'admin'
+          let modified = false;
+          parsed = parsed.map((u) => {
+            if (u.username.toLowerCase().trim() === 'admin') {
+              if (u.password === 'Brasil.2026') {
+                modified = true;
+                return { ...u, password: 'admin', firstLoginPending: true };
+              }
+              if (u.password === 'admin' && u.firstLoginPending === undefined) {
+                modified = true;
+                return { ...u, firstLoginPending: true };
+              }
+            }
+            return u;
+          });
+          if (modified) {
+            localStorage.setItem(USERS_STORAGE_KEY, JSON.stringify(parsed));
+          }
           return parsed;
         }
       }
@@ -184,6 +206,27 @@ export const SchoolProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     } catch {
       return isAuthenticated ? 'admin' : null;
     }
+  });
+
+  // First Login Password Modification Modal state
+  const [showFirstLoginModal, setShowFirstLoginModal] = useState<boolean>(() => {
+    try {
+      const isAuth = sessionStorage.getItem(AUTH_SESSION_KEY) === 'true';
+      const activeUser = sessionStorage.getItem(AUTH_SESSION_USER);
+      if (isAuth && activeUser) {
+        const saved = localStorage.getItem(USERS_STORAGE_KEY);
+        if (saved) {
+          const parsed: AdminUser[] = JSON.parse(saved);
+          const found = parsed.find((u) => u.username.toLowerCase().trim() === activeUser.toLowerCase().trim());
+          if (found && (found.firstLoginPending || (found.username.toLowerCase().trim() === 'admin' && found.password === 'admin'))) {
+            return true;
+          }
+        }
+      }
+    } catch {
+      // Ignore
+    }
+    return false;
   });
 
   const currentUserProfile = useMemo(() => {
@@ -345,6 +388,15 @@ export const SchoolProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       if (matched.rol !== 'SuperAdmin' && activeTab === 'backups_usuarios') {
         setActiveTab('cursos_alumnos');
       }
+
+      // Check if this is the first login or if default password is still active
+      if (
+        matched.firstLoginPending ||
+        (matched.username.toLowerCase().trim() === 'admin' && matched.password === 'admin')
+      ) {
+        setShowFirstLoginModal(true);
+      }
+
       setSystemNotice(`Bienvenido/a, ${matched.nombre} (${matched.rol}). Base de datos conectada.`);
       return true;
     }
@@ -355,12 +407,52 @@ export const SchoolProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   const logout = () => {
     setIsAuthenticated(false);
     setCurrentUser(null);
+    setShowFirstLoginModal(false);
     try {
       sessionStorage.removeItem(AUTH_SESSION_KEY);
       sessionStorage.removeItem(AUTH_SESSION_USER);
     } catch {
       // Ignore
     }
+  };
+
+  // Change Admin Password on First Login or from Settings
+  const changeAdminPassword = (newPassword: string, newNombre?: string): { success: boolean; message?: string } => {
+    const cleanPass = newPassword.trim();
+    if (!cleanPass || cleanPass.length < 4) {
+      return { success: false, message: 'La nueva contraseña debe tener al menos 4 caracteres.' };
+    }
+    if (cleanPass.toLowerCase() === 'admin') {
+      return { success: false, message: 'Por favor ingrese una contraseña diferente de la predeterminada "admin".' };
+    }
+
+    const activeUser = currentUserProfile || users.find((u) => u.username.toLowerCase().trim() === 'admin');
+    if (!activeUser) {
+      return { success: false, message: 'No se encontró el usuario activo.' };
+    }
+
+    const updated = users.map((u) => {
+      if (u.id === activeUser.id) {
+        return {
+          ...u,
+          password: cleanPass,
+          nombre: newNombre && newNombre.trim() ? newNombre.trim() : u.nombre,
+          firstLoginPending: false,
+        };
+      }
+      return u;
+    });
+
+    setUsers(updated);
+    try {
+      localStorage.setItem(USERS_STORAGE_KEY, JSON.stringify(updated));
+    } catch (e) {
+      console.error(e);
+    }
+
+    setShowFirstLoginModal(false);
+    setSystemNotice('¡Contraseña de administrador actualizada con éxito! Se han guardado sus nuevas credenciales.');
+    return { success: true };
   };
 
   // User Management: Register New User (SuperAdmin ONLY)
@@ -390,6 +482,7 @@ export const SchoolProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       nombre: newUserData.nombre.trim() || norm,
       rol: newUserData.rol || 'Administrador',
       createdAt: new Date().toISOString(),
+      firstLoginPending: false,
     };
 
     const nextUsers = [...users, created];
@@ -419,10 +512,72 @@ export const SchoolProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   };
 
   // User Management: Update User (SuperAdmin ONLY)
-  const updateUser = (id: string, partial: Partial<Omit<AdminUser, 'id' | 'createdAt'>>) => {
+  const updateUser = (
+    id: string,
+    partial: Partial<Omit<AdminUser, 'id' | 'createdAt'>>
+  ): { success: boolean; message?: string } => {
     if (!isSuperAdmin) {
-      setSystemNotice('Acceso denegado: Solamente el Administrador General con rol SuperAdmin puede modificar usuarios.');
-      return;
+      const msg = 'Acceso denegado: Solamente el Administrador General con rol SuperAdmin puede modificar usuarios.';
+      setSystemNotice(msg);
+      return { success: false, message: msg };
+    }
+
+    const target = users.find((u) => u.id === id);
+    if (!target) {
+      return { success: false, message: 'Usuario no encontrado en el sistema.' };
+    }
+
+    // Validate username if provided
+    let newNorm = target.username.toLowerCase().trim();
+    if (partial.username !== undefined) {
+      const trimmedUser = partial.username.toLowerCase().trim();
+      if (!trimmedUser || trimmedUser.length < 3) {
+        return { success: false, message: 'El nombre de usuario debe contener al menos 3 caracteres.' };
+      }
+      const conflict = users.find((u) => u.id !== id && u.username.toLowerCase().trim() === trimmedUser);
+      if (conflict) {
+        return { success: false, message: `El nombre de usuario "@${trimmedUser}" ya está asignado a otra cuenta.` };
+      }
+      newNorm = trimmedUser;
+    }
+
+    // Validate password if provided
+    if (partial.password !== undefined) {
+      if (!partial.password || partial.password.trim().length < 4) {
+        return { success: false, message: 'La contraseña debe contener al menos 4 caracteres.' };
+      }
+    }
+
+    // Check that we don't accidentally remove the SuperAdmin role from the last remaining SuperAdmin
+    if (target.rol === 'SuperAdmin' && partial.rol && partial.rol !== 'SuperAdmin') {
+      const superAdminCount = users.filter((u) => u.rol === 'SuperAdmin').length;
+      if (superAdminCount <= 1) {
+        return {
+          success: false,
+          message: 'No puedes revocar el rol SuperAdmin al único superusuario del sistema.',
+        };
+      }
+    }
+
+    // If username changed, migrate existing database storage keys to new username
+    const oldNorm = target.username.toLowerCase().trim();
+    if (newNorm !== oldNorm) {
+      try {
+        const partitionKeys = ['grupos', 'alumnos', 'asistencias', 'temarios', 'desempenos', 'notas', 'max_absences', 'backups', 'db_url'];
+        partitionKeys.forEach((k) => {
+          const oldVal = localStorage.getItem(getUserStorageKey(oldNorm, k));
+          if (oldVal !== null) {
+            localStorage.setItem(getUserStorageKey(newNorm, k), oldVal);
+            localStorage.removeItem(getUserStorageKey(oldNorm, k));
+          }
+        });
+        if (currentUser?.toLowerCase().trim() === oldNorm) {
+          setCurrentUser(newNorm);
+          sessionStorage.setItem(AUTH_SESSION_USER, newNorm);
+        }
+      } catch (err) {
+        console.error('Error migrando partición:', err);
+      }
     }
 
     const updated = users.map((u) => {
@@ -430,19 +585,25 @@ export const SchoolProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         return {
           ...u,
           ...partial,
-          nombre: partial.nombre ? partial.nombre.trim() : u.nombre,
-          username: partial.username ? partial.username.toLowerCase().trim() : u.username,
+          nombre: partial.nombre !== undefined ? partial.nombre.trim() : u.nombre,
+          username: newNorm,
+          password: partial.password !== undefined ? partial.password.trim() : u.password,
+          rol: partial.rol !== undefined ? partial.rol : u.rol,
+          firstLoginPending: partial.firstLoginPending !== undefined ? partial.firstLoginPending : u.firstLoginPending,
         };
       }
       return u;
     });
+
     setUsers(updated);
     try {
       localStorage.setItem(USERS_STORAGE_KEY, JSON.stringify(updated));
     } catch (e) {
       console.error(e);
     }
-    setSystemNotice('Datos de usuario actualizados correctamente.');
+
+    setSystemNotice(`Usuario "${partial.nombre || target.nombre}" (@${newNorm}) actualizado con éxito.`);
+    return { success: true };
   };
 
   // User Management: Delete User (SuperAdmin ONLY)
@@ -1273,8 +1434,11 @@ ${notas
         currentUserProfile,
         isSuperAdmin,
         users,
+        showFirstLoginModal,
+        setShowFirstLoginModal,
         login,
         logout,
+        changeAdminPassword,
         registerUser,
         updateUser,
         deleteUser,
