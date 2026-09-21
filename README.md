@@ -43,21 +43,61 @@
 
 ## 📸 Capturas y Muestreo de la Interfaz
 
-### 1. Panel de Control y Tablero Académico
-El panel central consolida los cursos activos, matrícula total, estadísticas de presentismo diario y la distribución de alumnos según su rendimiento:
-
-![Panel de Control Principal](./docs/images/dashboard_preview.jpg)
-
-*Vista del Tablero Académico con métricas consolidadas, gestión de cursos y tabla de seguimiento en tiempo real.*
+A continuación se muestra el recorrido visual por cada uno de los módulos en funcionamiento del sistema:
 
 ---
 
-### 2. Nómina de Estudiantes y Emisión de Reportes en PDF
-Módulo dedicado a la visualización de la lista de alumnos con búsqueda inteligente, filtros por condición y botones de descarga instantánea en PDF oficial:
+### 1. Módulo 1: Gestión de Cursos y Estudiantes
+Panel de administración de grupos académicos (asignaturas técnicas) con conteo dinámico de matriculados, badges por curso y acceso rápido para agregar nuevos cursos o inscribir estudiantes:
 
-![Nómina de Estudiantes y Reportes](./docs/images/reports_preview.jpg)
+![Módulo 1 - Cursos y Estudiantes](./docs/images/cursos_estudiantes.jpg)
 
-*Sección de Lista de Estudiantes con opciones de descarga en Formato Académico Completo o Planilla para Firmas de Asistencia.*
+*Vista del Módulo 1: Catálogo de cursos activos (`Electrónica y Microcontroladores`, `Redes y Telecomunicaciones`, `Automatización y Robótica Industrial`) y accesos de filtrado.*
+
+---
+
+### 2. Nómina Oficial y Padrón Escolar (Descarga en PDF)
+Sección dedicada al listado global de alumnos matriculados con filtros por condición, promedios en tiempo real y descarga instantánea en formato PDF oficial (formato académico completo o planilla con líneas de firmas físicas):
+
+![Nómina Oficial de Estudiantes](./docs/images/lista_estudiantes.jpg)
+
+*Vista de Nómina Escolar: Indicadores KPI de aprobados, regulares, en riesgo, promedio general y selector de descarga de reportes PDF.*
+
+---
+
+### 3. Módulo 2: Control de Asistencia Diaria
+Seguimiento diario de presencias con selector de fecha (Hoy, Ayer o calendario), métricas automáticas de presentes y ausentes, barra de presentismo porcentual y botones de acción rápida (*Marcar Todos Presentes*, *Marcar Todos Ausentes*, *Invertir Selección*):
+
+![Módulo 2 - Control de Asistencia Diaria](./docs/images/control_asistencia.jpg)
+
+*Vista del Módulo 2: Registro por alumno con casillas de verificación interactivas y cálculo inmediato de inasistencias acumuladas.*
+
+---
+
+### 4. Módulo 3: Contenido del Día y Evaluación de Desempeño
+Planificación curricular por sesión técnica vinculada a un checklist individual de participación y desempeño formativo por estudiante (con opciones *Excelente*, *Bueno*, *Regular*, *Necesita Refuerzo*):
+
+![Módulo 3 - Contenido y Desempeño](./docs/images/contenido_desempeno.jpg)
+
+*Vista del Módulo 3: Ficha técnica de la clase (Unidad temática, temas desarrollados, objetivos de aprendizaje y equipamiento) y grilla de evaluación continua.*
+
+---
+
+### 5. Módulo 4: Calificaciones y Alertas Académicas
+Panel analítico con tarjetas de alerta por exceso de inasistencias (límite configurable), promedio general de la cohorte, conteo de aprobados y tabla relacional de notas:
+
+![Módulo 4 - Calificaciones y Alertas Académicas](./docs/images/calificaciones_alertas.jpg)
+
+*Vista del Módulo 4: Resumen analítico global con semáforo de aprobación, indicador de estudiantes en riesgo y configuración de tope de inasistencias permitidas.*
+
+---
+
+### 6. Tabla Detallada de Calificaciones y Fichas PDF
+Grilla exhaustiva de notas por estudiante con código de color en promedios, inasistencias acumuladas, estado de alerta y descarga individual de informes:
+
+![Módulo 4 - Grilla de Calificaciones](./docs/images/calificaciones_tabla.jpg)
+
+*Vista de Detalle: Seguimiento nominal por alumno con botones para registrar nuevas notas parciales y exportar el informe académico individual.*
 
 ---
 
