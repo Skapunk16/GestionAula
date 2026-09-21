@@ -9,6 +9,8 @@ import {
   EstadoDesempeno,
   ResumenAlumno,
   TabKey,
+  AdminUser,
+  DatabaseBackup,
 } from '../types';
 import {
   INITIAL_GRUPOS,
@@ -24,13 +26,21 @@ import {
   DEMO_DESEMPENOS,
   DEMO_NOTAS,
 } from '../data/initialData';
+import { generateStudentReportPDF } from '../utils/pdfGenerator';
 
 interface SchoolContextType {
-  // Authentication
+  // Authentication & Multi-User
   isAuthenticated: boolean;
   currentUser: string | null;
+  currentUserProfile: AdminUser | null;
+  isSuperAdmin: boolean;
+  users: AdminUser[];
   login: (user: string, pass: string) => boolean;
   logout: () => void;
+  registerUser: (user: Omit<AdminUser, 'id' | 'createdAt'>) => { success: boolean; message?: string };
+  updateUser: (id: string, partial: Partial<Omit<AdminUser, 'id' | 'createdAt'>>) => void;
+  deleteUser: (id: string) => { success: boolean; message?: string };
+  switchUser: (username: string) => void;
 
   // Cloud Database configuration
   databaseUrl: string;
@@ -64,10 +74,10 @@ interface SchoolContextType {
   deleteGrupo: (id_curso: number) => void;
 
   // Alumno actions
-  addAlumno: (nombre: string, apellido: string, id_curso: number | null, certificado: boolean) => Alumno;
-  updateAlumno: (id_alumno: number, nombre: string, apellido: string, id_curso: number | null, certificado: boolean) => void;
+  addAlumno: (nombre: string, apellido: string, id_curso: number | null) => Alumno;
+  updateAlumno: (id_alumno: number, nombre: string, apellido: string, id_curso: number | null) => void;
   deleteAlumno: (id_alumno: number) => void;
-  toggleCertificado: (id_alumno: number) => void;
+  downloadStudentReport: (id_alumno: number) => void;
 
   // Asistencia actions
   setAsistencia: (id_alumno: number, fecha: string, asistio: boolean) => void;
@@ -93,20 +103,67 @@ interface SchoolContextType {
   totalAlumnosEnRiesgo: number;
   promedioGeneralInstitucional: number;
 
+  // Backups & Snapshots
+  backups: DatabaseBackup[];
+  createBackup: (name?: string, isAuto?: boolean) => DatabaseBackup;
+  restoreBackup: (backupId: string) => boolean;
+  deleteBackup: (backupId: string) => void;
+  exportBackupJson: (backupId?: string) => void;
+  importBackupJson: (jsonString: string, mode: 'replace' | 'merge') => { success: boolean; message: string };
+
+  // System Toast Notice
+  systemNotice: string | null;
+  setSystemNotice: (msg: string | null) => void;
+
   // Reset, Clear & Export
   clearAllData: () => void;
-  loadDemoData: () => void;
+  loadDemoData: (preserveExisting?: boolean) => void;
   resetToDefaults: () => void;
   generatePostgreSQLScript: () => string;
 }
 
 const LOCAL_STORAGE_KEY = 'gestion_escolar_v2_clean';
 const AUTH_SESSION_KEY = 'gestion_escolar_auth_session';
+const AUTH_SESSION_USER = 'gestion_escolar_auth_user';
+const USERS_STORAGE_KEY = 'gestion_escolar_users_v1';
+
+const DEFAULT_USERS: AdminUser[] = [
+  {
+    id: 'user-admin-default',
+    username: 'admin',
+    password: 'Brasil.2026',
+    nombre: 'Administrador General',
+    rol: 'SuperAdmin',
+    createdAt: '2026-09-01T00:00:00.000Z',
+  },
+];
+
+const getUserStorageKey = (username: string, key: string) => {
+  const cleanUser = (username || 'admin').toLowerCase().trim();
+  return `gestion_escolar_v2_u_${cleanUser}_${key}`;
+};
 
 const SchoolContext = createContext<SchoolContextType | undefined>(undefined);
 
 export const SchoolProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  // Authentication state - starts locked by default
+  // 1. Users registry state
+  const [users, setUsers] = useState<AdminUser[]>(() => {
+    try {
+      const saved = localStorage.getItem(USERS_STORAGE_KEY);
+      if (saved) {
+        const parsed: AdminUser[] = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed;
+        }
+      }
+      localStorage.setItem(USERS_STORAGE_KEY, JSON.stringify(DEFAULT_USERS));
+      return DEFAULT_USERS;
+    } catch {
+      return DEFAULT_USERS;
+    }
+  });
+
+  // 2. Authentication state
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
     try {
       return sessionStorage.getItem(AUTH_SESSION_KEY) === 'true';
@@ -114,135 +171,333 @@ export const SchoolProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       return false;
     }
   });
+
   const [currentUser, setCurrentUser] = useState<string | null>(() => {
-    return isAuthenticated ? 'admin' : null;
-  });
-
-  const login = (user: string, pass: string): boolean => {
-    if (user.trim() === 'admin' && pass === 'Brasil.2026') {
-      setIsAuthenticated(true);
-      setCurrentUser('admin');
-      try {
-        sessionStorage.setItem(AUTH_SESSION_KEY, 'true');
-      } catch {
-        // Ignore session storage error
-      }
-      return true;
-    }
-    return false;
-  };
-
-  const logout = () => {
-    setIsAuthenticated(false);
-    setCurrentUser(null);
     try {
-      sessionStorage.removeItem(AUTH_SESSION_KEY);
+      return sessionStorage.getItem(AUTH_SESSION_USER) || (isAuthenticated ? 'admin' : null);
     } catch {
-      // Ignore
-    }
-  };
-
-  // Cloud Database URL State
-  const [databaseUrl, setDatabaseUrl] = useState<string>(() => {
-    try {
-      return localStorage.getItem(`${LOCAL_STORAGE_KEY}_db_url`) || '';
-    } catch {
-      return '';
+      return isAuthenticated ? 'admin' : null;
     }
   });
 
+  const currentUserProfile = useMemo(() => {
+    if (!currentUser) return null;
+    return users.find((u) => u.username.toLowerCase().trim() === currentUser.toLowerCase().trim()) || null;
+  }, [users, currentUser]);
+
+  const isSuperAdmin = currentUserProfile?.rol === 'SuperAdmin';
+
+  // System toast notice
+  const [systemNotice, setSystemNotice] = useState<string | null>(null);
+  useEffect(() => {
+    if (systemNotice) {
+      const timer = setTimeout(() => setSystemNotice(null), 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [systemNotice]);
+
+  // Active Tab & Filters
   const [activeTab, setActiveTab] = useState<TabKey>('cursos_alumnos');
   const [maxAbsencesThreshold, setMaxAbsencesThreshold] = useState<number>(5);
-
   const [selectedCursoId, setSelectedCursoId] = useState<number | 'all'>('all');
   const [selectedFechaAsistencia, setSelectedFechaAsistencia] = useState<string>(() => {
     return new Date().toISOString().split('T')[0];
   });
 
-  // Table states with persistence (defaulting to clean empty templates)
-  const [grupos, setGrupos] = useState<Grupo[]>(() => {
-    try {
-      const saved = localStorage.getItem(`${LOCAL_STORAGE_KEY}_grupos`);
-      return saved ? JSON.parse(saved) : INITIAL_GRUPOS;
-    } catch {
-      return INITIAL_GRUPOS;
-    }
-  });
+  // Cloud Database URL State
+  const [databaseUrl, setDatabaseUrl] = useState<string>('');
 
-  const [alumnos, setAlumnos] = useState<Alumno[]>(() => {
-    try {
-      const saved = localStorage.getItem(`${LOCAL_STORAGE_KEY}_alumnos`);
-      return saved ? JSON.parse(saved) : INITIAL_ALUMNOS;
-    } catch {
-      return INITIAL_ALUMNOS;
-    }
-  });
+  // 3. User's Isolated Table States
+  const [grupos, setGrupos] = useState<Grupo[]>([]);
+  const [alumnos, setAlumnos] = useState<Alumno[]>([]);
+  const [asistencias, setAsistencias] = useState<Asistencia[]>([]);
+  const [temarios, setTemarios] = useState<TemarioDia[]>([]);
+  const [desempenos, setDesempenos] = useState<DesempenoClase[]>([]);
+  const [notas, setNotas] = useState<Nota[]>([]);
+  const [backups, setBackups] = useState<DatabaseBackup[]>([]);
 
-  const [asistencias, setAsistencias] = useState<Asistencia[]>(() => {
+  // Function to load the isolated database for a specific username
+  const loadUserDataPartition = (username: string) => {
+    const norm = (username || 'admin').toLowerCase().trim();
     try {
-      const saved = localStorage.getItem(`${LOCAL_STORAGE_KEY}_asistencias`);
-      return saved ? JSON.parse(saved) : INITIAL_ASISTENCIAS;
-    } catch {
-      return INITIAL_ASISTENCIAS;
-    }
-  });
+      // 1. Grupos (with backward compatibility migration for 'admin')
+      let savedGrupos = localStorage.getItem(getUserStorageKey(norm, 'grupos'));
+      if (!savedGrupos && norm === 'admin') {
+        savedGrupos = localStorage.getItem(`${LOCAL_STORAGE_KEY}_grupos`);
+      }
+      setGrupos(savedGrupos ? JSON.parse(savedGrupos) : INITIAL_GRUPOS);
 
-  const [temarios, setTemarios] = useState<TemarioDia[]>(() => {
-    try {
-      const saved = localStorage.getItem(`${LOCAL_STORAGE_KEY}_temarios`);
-      return saved ? JSON.parse(saved) : INITIAL_TEMARIOS;
-    } catch {
-      return INITIAL_TEMARIOS;
-    }
-  });
+      // 2. Alumnos
+      let savedAlumnos = localStorage.getItem(getUserStorageKey(norm, 'alumnos'));
+      if (!savedAlumnos && norm === 'admin') {
+        savedAlumnos = localStorage.getItem(`${LOCAL_STORAGE_KEY}_alumnos`);
+      }
+      setAlumnos(savedAlumnos ? JSON.parse(savedAlumnos) : INITIAL_ALUMNOS);
 
-  const [desempenos, setDesempenos] = useState<DesempenoClase[]>(() => {
-    try {
-      const saved = localStorage.getItem(`${LOCAL_STORAGE_KEY}_desempenos`);
-      return saved ? JSON.parse(saved) : INITIAL_DESEMPENOS;
-    } catch {
-      return INITIAL_DESEMPENOS;
-    }
-  });
+      // 3. Asistencias
+      let savedAsistencias = localStorage.getItem(getUserStorageKey(norm, 'asistencias'));
+      if (!savedAsistencias && norm === 'admin') {
+        savedAsistencias = localStorage.getItem(`${LOCAL_STORAGE_KEY}_asistencias`);
+      }
+      setAsistencias(savedAsistencias ? JSON.parse(savedAsistencias) : INITIAL_ASISTENCIAS);
 
-  const [notas, setNotas] = useState<Nota[]>(() => {
-    try {
-      const saved = localStorage.getItem(`${LOCAL_STORAGE_KEY}_notas`);
-      return saved ? JSON.parse(saved) : INITIAL_NOTAS;
-    } catch {
-      return INITIAL_NOTAS;
-    }
-  });
+      // 4. Temarios
+      let savedTemarios = localStorage.getItem(getUserStorageKey(norm, 'temarios'));
+      if (!savedTemarios && norm === 'admin') {
+        savedTemarios = localStorage.getItem(`${LOCAL_STORAGE_KEY}_temarios`);
+      }
+      setTemarios(savedTemarios ? JSON.parse(savedTemarios) : INITIAL_TEMARIOS);
 
-  // Persist to local storage
+      // 5. Desempenos
+      let savedDesempenos = localStorage.getItem(getUserStorageKey(norm, 'desempenos'));
+      if (!savedDesempenos && norm === 'admin') {
+        savedDesempenos = localStorage.getItem(`${LOCAL_STORAGE_KEY}_desempenos`);
+      }
+      setDesempenos(savedDesempenos ? JSON.parse(savedDesempenos) : INITIAL_DESEMPENOS);
+
+      // 6. Notas
+      let savedNotas = localStorage.getItem(getUserStorageKey(norm, 'notas'));
+      if (!savedNotas && norm === 'admin') {
+        savedNotas = localStorage.getItem(`${LOCAL_STORAGE_KEY}_notas`);
+      }
+      setNotas(savedNotas ? JSON.parse(savedNotas) : INITIAL_NOTAS);
+
+      // Max absences
+      let savedThreshold = localStorage.getItem(getUserStorageKey(norm, 'max_absences'));
+      if (!savedThreshold && norm === 'admin') {
+        savedThreshold = localStorage.getItem(`${LOCAL_STORAGE_KEY}_max_absences`);
+      }
+      setMaxAbsencesThreshold(savedThreshold ? JSON.parse(savedThreshold) : 5);
+
+      // Backups
+      const savedBackups = localStorage.getItem(getUserStorageKey(norm, 'backups'));
+      setBackups(savedBackups ? JSON.parse(savedBackups) : []);
+
+      // DB URL
+      let savedDbUrl = localStorage.getItem(getUserStorageKey(norm, 'db_url'));
+      if (!savedDbUrl && norm === 'admin') {
+        savedDbUrl = localStorage.getItem(`${LOCAL_STORAGE_KEY}_db_url`) || '';
+      }
+      setDatabaseUrl(savedDbUrl || '');
+
+      setSelectedCursoId('all');
+    } catch (e) {
+      console.error('Error cargando partición de base de datos de usuario:', e);
+    }
+  };
+
+  // Initial load when mounted
   useEffect(() => {
+    const activeUsername = currentUser || 'admin';
+    loadUserDataPartition(activeUsername);
+  }, []);
+
+  // Save changes to current user's isolated storage
+  useEffect(() => {
+    const activeUsername = currentUser || 'admin';
     try {
-      localStorage.setItem(`${LOCAL_STORAGE_KEY}_grupos`, JSON.stringify(grupos));
-      localStorage.setItem(`${LOCAL_STORAGE_KEY}_alumnos`, JSON.stringify(alumnos));
-      localStorage.setItem(`${LOCAL_STORAGE_KEY}_asistencias`, JSON.stringify(asistencias));
-      localStorage.setItem(`${LOCAL_STORAGE_KEY}_temarios`, JSON.stringify(temarios));
-      localStorage.setItem(`${LOCAL_STORAGE_KEY}_desempenos`, JSON.stringify(desempenos));
-      localStorage.setItem(`${LOCAL_STORAGE_KEY}_notas`, JSON.stringify(notas));
-      localStorage.setItem(`${LOCAL_STORAGE_KEY}_max_absences`, JSON.stringify(maxAbsencesThreshold));
+      localStorage.setItem(getUserStorageKey(activeUsername, 'grupos'), JSON.stringify(grupos));
+      localStorage.setItem(getUserStorageKey(activeUsername, 'alumnos'), JSON.stringify(alumnos));
+      localStorage.setItem(getUserStorageKey(activeUsername, 'asistencias'), JSON.stringify(asistencias));
+      localStorage.setItem(getUserStorageKey(activeUsername, 'temarios'), JSON.stringify(temarios));
+      localStorage.setItem(getUserStorageKey(activeUsername, 'desempenos'), JSON.stringify(desempenos));
+      localStorage.setItem(getUserStorageKey(activeUsername, 'notas'), JSON.stringify(notas));
+      localStorage.setItem(getUserStorageKey(activeUsername, 'max_absences'), JSON.stringify(maxAbsencesThreshold));
       if (databaseUrl) {
-        localStorage.setItem(`${LOCAL_STORAGE_KEY}_db_url`, databaseUrl);
+        localStorage.setItem(getUserStorageKey(activeUsername, 'db_url'), databaseUrl);
       }
     } catch (e) {
-      console.error('Error saving to localStorage', e);
+      console.error('Error saving to isolated localStorage', e);
     }
-  }, [grupos, alumnos, asistencias, temarios, desempenos, notas, maxAbsencesThreshold, databaseUrl]);
+  }, [grupos, alumnos, asistencias, temarios, desempenos, notas, maxAbsencesThreshold, databaseUrl, currentUser]);
 
-  // Load saved threshold on mount
+  // Save backups to current user's isolated storage
   useEffect(() => {
+    const activeUsername = currentUser || 'admin';
     try {
-      const savedLimit = localStorage.getItem(`${LOCAL_STORAGE_KEY}_max_absences`);
-      if (savedLimit) {
-        setMaxAbsencesThreshold(JSON.parse(savedLimit));
-      }
-    } catch {
-      // ignore
+      localStorage.setItem(getUserStorageKey(activeUsername, 'backups'), JSON.stringify(backups));
+    } catch (e) {
+      console.error('Error saving backups', e);
     }
-  }, []);
+  }, [backups, currentUser]);
+
+  // Auth: Login
+  const login = (user: string, pass: string): boolean => {
+    const norm = user.toLowerCase().trim();
+    const matched = users.find((u) => u.username.toLowerCase().trim() === norm && u.password === pass);
+
+    if (matched) {
+      setIsAuthenticated(true);
+      setCurrentUser(matched.username);
+      try {
+        sessionStorage.setItem(AUTH_SESSION_KEY, 'true');
+        sessionStorage.setItem(AUTH_SESSION_USER, matched.username);
+      } catch {
+        // Ignore
+      }
+      loadUserDataPartition(matched.username);
+      if (matched.rol !== 'SuperAdmin' && activeTab === 'backups_usuarios') {
+        setActiveTab('cursos_alumnos');
+      }
+      setSystemNotice(`Bienvenido/a, ${matched.nombre} (${matched.rol}). Base de datos conectada.`);
+      return true;
+    }
+    return false;
+  };
+
+  // Auth: Logout
+  const logout = () => {
+    setIsAuthenticated(false);
+    setCurrentUser(null);
+    try {
+      sessionStorage.removeItem(AUTH_SESSION_KEY);
+      sessionStorage.removeItem(AUTH_SESSION_USER);
+    } catch {
+      // Ignore
+    }
+  };
+
+  // User Management: Register New User (SuperAdmin ONLY)
+  const registerUser = (newUserData: Omit<AdminUser, 'id' | 'createdAt'>): { success: boolean; message?: string } => {
+    if (!isSuperAdmin) {
+      return {
+        success: false,
+        message: 'Acceso denegado: Solamente el Administrador General con rol SuperAdmin tiene autorización para registrar usuarios.',
+      };
+    }
+
+    const norm = newUserData.username.toLowerCase().trim();
+    if (!norm || norm.length < 3) {
+      return { success: false, message: 'El nombre de usuario debe contener al menos 3 caracteres alfanuméricos.' };
+    }
+    if (!newUserData.password || newUserData.password.length < 4) {
+      return { success: false, message: 'La contraseña debe contener al menos 4 caracteres.' };
+    }
+    if (users.some((u) => u.username.toLowerCase().trim() === norm)) {
+      return { success: false, message: `El usuario "${newUserData.username}" ya se encuentra registrado.` };
+    }
+
+    const created: AdminUser = {
+      id: 'user-' + Date.now() + '-' + Math.random().toString(36).substring(2, 7),
+      username: norm,
+      password: newUserData.password,
+      nombre: newUserData.nombre.trim() || norm,
+      rol: newUserData.rol || 'Administrador',
+      createdAt: new Date().toISOString(),
+    };
+
+    const nextUsers = [...users, created];
+    setUsers(nextUsers);
+    try {
+      localStorage.setItem(USERS_STORAGE_KEY, JSON.stringify(nextUsers));
+    } catch (e) {
+      console.error(e);
+    }
+
+    // Initialize an empty database partition for this new user
+    try {
+      localStorage.setItem(getUserStorageKey(norm, 'grupos'), JSON.stringify([]));
+      localStorage.setItem(getUserStorageKey(norm, 'alumnos'), JSON.stringify([]));
+      localStorage.setItem(getUserStorageKey(norm, 'asistencias'), JSON.stringify([]));
+      localStorage.setItem(getUserStorageKey(norm, 'temarios'), JSON.stringify([]));
+      localStorage.setItem(getUserStorageKey(norm, 'desempenos'), JSON.stringify([]));
+      localStorage.setItem(getUserStorageKey(norm, 'notas'), JSON.stringify([]));
+      localStorage.setItem(getUserStorageKey(norm, 'max_absences'), JSON.stringify(5));
+      localStorage.setItem(getUserStorageKey(norm, 'backups'), JSON.stringify([]));
+    } catch (e) {
+      console.error(e);
+    }
+
+    setSystemNotice(`Usuario "${created.nombre}" (${created.username}) creado con éxito con su propia base de datos.`);
+    return { success: true };
+  };
+
+  // User Management: Update User (SuperAdmin ONLY)
+  const updateUser = (id: string, partial: Partial<Omit<AdminUser, 'id' | 'createdAt'>>) => {
+    if (!isSuperAdmin) {
+      setSystemNotice('Acceso denegado: Solamente el Administrador General con rol SuperAdmin puede modificar usuarios.');
+      return;
+    }
+
+    const updated = users.map((u) => {
+      if (u.id === id) {
+        return {
+          ...u,
+          ...partial,
+          nombre: partial.nombre ? partial.nombre.trim() : u.nombre,
+          username: partial.username ? partial.username.toLowerCase().trim() : u.username,
+        };
+      }
+      return u;
+    });
+    setUsers(updated);
+    try {
+      localStorage.setItem(USERS_STORAGE_KEY, JSON.stringify(updated));
+    } catch (e) {
+      console.error(e);
+    }
+    setSystemNotice('Datos de usuario actualizados correctamente.');
+  };
+
+  // User Management: Delete User (SuperAdmin ONLY)
+  const deleteUser = (id: string): { success: boolean; message?: string } => {
+    if (!isSuperAdmin) {
+      return {
+        success: false,
+        message: 'Acceso denegado: Solamente el Administrador General con rol SuperAdmin puede eliminar usuarios.',
+      };
+    }
+
+    const target = users.find((u) => u.id === id);
+    if (!target) return { success: false, message: 'Usuario no encontrado.' };
+
+    if (users.length <= 1) {
+      return { success: false, message: 'No es posible eliminar el único usuario del sistema.' };
+    }
+    if (currentUserProfile?.id === id) {
+      return { success: false, message: 'No puedes eliminar el usuario con el que te encuentras autenticado.' };
+    }
+
+    const updated = users.filter((u) => u.id !== id);
+    setUsers(updated);
+    try {
+      localStorage.setItem(USERS_STORAGE_KEY, JSON.stringify(updated));
+      const norm = target.username.toLowerCase().trim();
+      localStorage.removeItem(getUserStorageKey(norm, 'grupos'));
+      localStorage.removeItem(getUserStorageKey(norm, 'alumnos'));
+      localStorage.removeItem(getUserStorageKey(norm, 'asistencias'));
+      localStorage.removeItem(getUserStorageKey(norm, 'temarios'));
+      localStorage.removeItem(getUserStorageKey(norm, 'desempenos'));
+      localStorage.removeItem(getUserStorageKey(norm, 'notas'));
+      localStorage.removeItem(getUserStorageKey(norm, 'max_absences'));
+      localStorage.removeItem(getUserStorageKey(norm, 'backups'));
+      localStorage.removeItem(getUserStorageKey(norm, 'db_url'));
+    } catch (e) {
+      console.error(e);
+    }
+    setSystemNotice(`Usuario "${target.username}" y su base de datos fueron eliminados.`);
+    return { success: true };
+  };
+
+  // User Management: Switch Active User Database (SuperAdmin ONLY)
+  const switchUser = (targetUsername: string) => {
+    if (!isSuperAdmin) {
+      setSystemNotice('Acceso denegado: Solamente el Administrador General con rol SuperAdmin puede alternar entre espacios de otros usuarios.');
+      return;
+    }
+
+    const target = users.find((u) => u.username.toLowerCase().trim() === targetUsername.toLowerCase().trim());
+    if (!target) return;
+    setCurrentUser(target.username);
+    try {
+      sessionStorage.setItem(AUTH_SESSION_KEY, 'true');
+      sessionStorage.setItem(AUTH_SESSION_USER, target.username);
+    } catch (e) {
+      console.error(e);
+    }
+    loadUserDataPartition(target.username);
+    setSystemNotice(`Cambiado al espacio y base de datos de: ${target.nombre} (${target.username})`);
+  };
 
   // --- CRUD: Grupos ---
   const addGrupo = (nombre_curso: string, descripcion: string): Grupo => {
@@ -264,100 +519,158 @@ export const SchoolProvider: React.FC<{ children: ReactNode }> = ({ children }) 
 
   const deleteGrupo = (id_curso: number) => {
     setGrupos((prev) => prev.filter((g) => g.id_curso !== id_curso));
-    // Set alumnos in this course to id_curso = null (Foreign key ON DELETE SET NULL)
     setAlumnos((prev) => prev.map((a) => (a.id_curso === id_curso ? { ...a, id_curso: null } : a)));
-    // Delete temarios for this course and their child desempenos
     const temariosToDelete = temarios.filter((t) => t.id_curso === id_curso).map((t) => t.id_temario);
     setTemarios((prev) => prev.filter((t) => t.id_curso !== id_curso));
     setDesempenos((prev) => prev.filter((d) => !temariosToDelete.includes(d.id_temario)));
   };
 
   // --- CRUD: Alumnos ---
-  const addAlumno = (nombre: string, apellido: string, id_curso: number | null, certificado: boolean): Alumno => {
+  const addAlumno = (nombre: string, apellido: string, id_curso: number | null): Alumno => {
     const nextId = alumnos.length > 0 ? Math.max(...alumnos.map((a) => a.id_alumno)) + 1 : 1;
     const newAlumno: Alumno = {
       id_alumno: nextId,
       nombre: nombre.trim(),
       apellido: apellido.trim(),
       id_curso,
-      certificado,
     };
     setAlumnos((prev) => [...prev, newAlumno]);
     return newAlumno;
   };
 
-  const updateAlumno = (id_alumno: number, nombre: string, apellido: string, id_curso: number | null, certificado: boolean) => {
+  const updateAlumno = (id_alumno: number, nombre: string, apellido: string, id_curso: number | null) => {
     setAlumnos((prev) =>
       prev.map((a) =>
         a.id_alumno === id_alumno
-          ? { ...a, nombre: nombre.trim(), apellido: apellido.trim(), id_curso, certificado }
+          ? { ...a, nombre: nombre.trim(), apellido: apellido.trim(), id_curso }
           : a
       )
     );
   };
 
   const deleteAlumno = (id_alumno: number) => {
-    // Cascade delete on related tables (Asistencia, Desempeno, Notas)
     setAlumnos((prev) => prev.filter((a) => a.id_alumno !== id_alumno));
     setAsistencias((prev) => prev.filter((asist) => asist.id_alumno !== id_alumno));
-    setDesempenos((prev) => prev.filter((d) => d.id_alumno !== id_alumno));
+    setDesempenos((prev) => prev.filter((des) => des.id_alumno !== id_alumno));
     setNotas((prev) => prev.filter((n) => n.id_alumno !== id_alumno));
   };
 
-  const toggleCertificado = (id_alumno: number) => {
-    setAlumnos((prev) =>
-      prev.map((a) => (a.id_alumno === id_alumno ? { ...a, certificado: !a.certificado } : a))
-    );
+  // Descargar Informe Oficial en PDF
+  const downloadStudentReport = (id_alumno: number) => {
+    const alumno = alumnos.find((a) => a.id_alumno === id_alumno);
+    if (!alumno) return;
+
+    const curso = grupos.find((g) => g.id_curso === alumno.id_curso) || null;
+    const studentNotas = notas.filter((n) => n.id_alumno === id_alumno);
+    const studentAsistencias = asistencias.filter((a) => a.id_alumno === id_alumno);
+    const studentDesempenos = desempenos.filter((d) => d.id_alumno === id_alumno);
+
+    const totalClases = studentAsistencias.length;
+    const faltasTotales = studentAsistencias.filter((a) => !a.asistio).length;
+    const asistenciasTotales = studentAsistencias.filter((a) => a.asistio).length;
+    const porcentajeAsistencia = totalClases > 0 ? Math.round((asistenciasTotales / totalClases) * 100) : 100;
+    const excedeFaltas = faltasTotales > maxAbsencesThreshold;
+
+    const promedio =
+      studentNotas.length > 0
+        ? Number((studentNotas.reduce((acc, curr) => acc + curr.nota, 0) / studentNotas.length).toFixed(2))
+        : null;
+
+    let estadoAprobacion: 'Aprobado' | 'Regular' | 'En Riesgo' | 'Sin Notas' = 'Sin Notas';
+    if (excedeFaltas) {
+      estadoAprobacion = 'En Riesgo';
+    } else if (promedio !== null) {
+      if (promedio >= 7.0) estadoAprobacion = 'Aprobado';
+      else if (promedio >= 4.0) estadoAprobacion = 'Regular';
+      else estadoAprobacion = 'En Riesgo';
+    }
+
+    const resumen: ResumenAlumno = {
+      alumno,
+      curso,
+      promedio,
+      totalNotas: studentNotas.length,
+      notas: studentNotas,
+      faltasTotales,
+      asistenciasTotales,
+      totalClasesRegistradas: totalClases,
+      porcentajeAsistencia,
+      excedeFaltas,
+      estadoAprobacion,
+    };
+
+    generateStudentReportPDF({
+      alumno,
+      curso,
+      resumen,
+      notas: studentNotas,
+      asistencias: studentAsistencias,
+      desempenos: studentDesempenos,
+      temarios,
+      maxAbsencesThreshold,
+    });
   };
 
-  // --- CRUD: Asistencia (Composite PK: id_alumno, fecha) ---
+  // --- Asistencias ---
   const setAsistencia = (id_alumno: number, fecha: string, asistio: boolean) => {
     setAsistencias((prev) => {
-      const index = prev.findIndex((item) => item.id_alumno === id_alumno && item.fecha === fecha);
-      if (index >= 0) {
-        const updated = [...prev];
-        updated[index] = { id_alumno, fecha, asistio };
-        return updated;
-      } else {
-        return [...prev, { id_alumno, fecha, asistio }];
+      const exists = prev.some((a) => a.id_alumno === id_alumno && a.fecha === fecha);
+      if (exists) {
+        return prev.map((a) => (a.id_alumno === id_alumno && a.fecha === fecha ? { ...a, asistio } : a));
       }
+      return [...prev, { id_alumno, fecha, asistio }];
     });
   };
 
   const markBatchAsistencia = (id_curso: number, fecha: string, asistio: boolean) => {
     const courseAlumnos = alumnos.filter((a) => a.id_curso === id_curso);
-    const alumnoIds = new Set(courseAlumnos.map((a) => a.id_alumno));
+    if (courseAlumnos.length === 0) return;
 
     setAsistencias((prev) => {
-      const others = prev.filter((item) => !(alumnoIds.has(item.id_alumno) && item.fecha === fecha));
-      const newItems: Asistencia[] = courseAlumnos.map((a) => ({
-        id_alumno: a.id_alumno,
+      const remaining = prev.filter(
+        (a) => !courseAlumnos.some((ca) => ca.id_alumno === a.id_alumno && a.fecha === fecha)
+      );
+      const newEntries: Asistencia[] = courseAlumnos.map((ca) => ({
+        id_alumno: ca.id_alumno,
         fecha,
         asistio,
       }));
-      return [...others, ...newItems];
+      return [...remaining, ...newEntries];
     });
   };
 
   const getAsistencia = (id_alumno: number, fecha: string): boolean | null => {
-    const item = asistencias.find((a) => a.id_alumno === id_alumno && a.fecha === fecha);
-    return item ? item.asistio : null;
+    const record = asistencias.find((a) => a.id_alumno === id_alumno && a.fecha === fecha);
+    return record ? record.asistio : null;
   };
 
-  // --- CRUD: Temario_Dia ---
+  // --- Temario_Dia ---
   const addTemario = (data: Omit<TemarioDia, 'id_temario'>): TemarioDia => {
     const nextId = temarios.length > 0 ? Math.max(...temarios.map((t) => t.id_temario)) + 1 : 1;
     const newTemario: TemarioDia = {
-      ...data,
       id_temario: nextId,
+      ...data,
+      unidad_tematica: data.unidad_tematica.trim(),
+      temas: data.temas.trim(),
+      objetivos: data.objetivos.trim(),
+      recursos: data.recursos.trim(),
     };
     setTemarios((prev) => [newTemario, ...prev]);
+
+    const courseAlumnos = alumnos.filter((a) => a.id_curso === data.id_curso);
+    const initialDesempenos: DesempenoClase[] = courseAlumnos.map((a) => ({
+      id_temario: nextId,
+      id_alumno: a.id_alumno,
+      estado_desempeno: 'Bueno',
+    }));
+    setDesempenos((prev) => [...prev, ...initialDesempenos]);
+
     return newTemario;
   };
 
   const updateTemario = (id_temario: number, data: Omit<TemarioDia, 'id_temario'>) => {
     setTemarios((prev) =>
-      prev.map((t) => (t.id_temario === id_temario ? { ...data, id_temario } : t))
+      prev.map((t) => (t.id_temario === id_temario ? { ...t, ...data } : t))
     );
   };
 
@@ -366,45 +679,46 @@ export const SchoolProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     setDesempenos((prev) => prev.filter((d) => d.id_temario !== id_temario));
   };
 
-  // --- CRUD: Desempeno_Clase (Composite PK: id_temario, id_alumno) ---
+  // --- Desempeno_Clase ---
   const setDesempeno = (id_temario: number, id_alumno: number, estado: EstadoDesempeno) => {
     setDesempenos((prev) => {
-      const index = prev.findIndex((d) => d.id_temario === id_temario && d.id_alumno === id_alumno);
-      if (index >= 0) {
-        const updated = [...prev];
-        updated[index] = { id_temario, id_alumno, estado_desempeno: estado };
-        return updated;
-      } else {
-        return [...prev, { id_temario, id_alumno, estado_desempeno: estado }];
+      const exists = prev.some((d) => d.id_temario === id_temario && d.id_alumno === id_alumno);
+      if (exists) {
+        return prev.map((d) =>
+          d.id_temario === id_temario && d.id_alumno === id_alumno ? { ...d, estado_desempeno: estado } : d
+        );
       }
+      return [...prev, { id_temario, id_alumno, estado_desempeno: estado }];
     });
   };
 
   const getDesempeno = (id_temario: number, id_alumno: number): EstadoDesempeno | null => {
-    const item = desempenos.find((d) => d.id_temario === id_temario && d.id_alumno === id_alumno);
-    return item ? item.estado_desempeno : null;
+    const record = desempenos.find((d) => d.id_temario === id_temario && d.id_alumno === id_alumno);
+    return record ? record.estado_desempeno : null;
   };
 
-  // --- CRUD: Notas ---
+  // --- Notas ---
   const addNota = (id_alumno: number, tipo_evaluacion: string, notaValue: number): Nota => {
     const nextId = notas.length > 0 ? Math.max(...notas.map((n) => n.id_nota)) + 1 : 1;
-    const cleanNota = Math.max(0, Math.min(10, Number(notaValue.toFixed(2))));
     const newNota: Nota = {
       id_nota: nextId,
       id_alumno,
       tipo_evaluacion: tipo_evaluacion.trim(),
-      nota: cleanNota,
+      nota: Math.min(10, Math.max(0, parseFloat(notaValue.toFixed(2)))),
     };
     setNotas((prev) => [...prev, newNota]);
     return newNota;
   };
 
   const updateNota = (id_nota: number, tipo_evaluacion: string, notaValue: number) => {
-    const cleanNota = Math.max(0, Math.min(10, Number(notaValue.toFixed(2))));
     setNotas((prev) =>
       prev.map((n) =>
         n.id_nota === id_nota
-          ? { ...n, tipo_evaluacion: tipo_evaluacion.trim(), nota: cleanNota }
+          ? {
+              ...n,
+              tipo_evaluacion: tipo_evaluacion.trim(),
+              nota: Math.min(10, Math.max(0, parseFloat(notaValue.toFixed(2)))),
+            }
           : n
       )
     );
@@ -414,43 +728,31 @@ export const SchoolProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     setNotas((prev) => prev.filter((n) => n.id_nota !== id_nota));
   };
 
-  // --- Global Student Analytics Summary ---
+  // --- Analytics & Summary ---
   const resumenAlumnos = useMemo<ResumenAlumno[]>(() => {
     return alumnos.map((alumno) => {
       const curso = grupos.find((g) => g.id_curso === alumno.id_curso) || null;
       const studentNotas = notas.filter((n) => n.id_alumno === alumno.id_alumno);
       const studentAsistencias = asistencias.filter((a) => a.id_alumno === alumno.id_alumno);
 
+      const totalClases = studentAsistencias.length;
       const faltasTotales = studentAsistencias.filter((a) => !a.asistio).length;
       const asistenciasTotales = studentAsistencias.filter((a) => a.asistio).length;
-      const totalClasesRegistradas = studentAsistencias.length;
-      const porcentajeAsistencia =
-        totalClasesRegistradas > 0
-          ? Math.round((asistenciasTotales / totalClasesRegistradas) * 100)
-          : 100;
+      const porcentajeAsistencia = totalClases > 0 ? Math.round((asistenciasTotales / totalClases) * 100) : 100;
+      const excedeFaltas = faltasTotales > maxAbsencesThreshold;
 
       const promedio =
         studentNotas.length > 0
-          ? Number(
-              (
-                studentNotas.reduce((acc, curr) => acc + curr.nota, 0) / studentNotas.length
-              ).toFixed(2)
-            )
+          ? Number((studentNotas.reduce((acc, curr) => acc + curr.nota, 0) / studentNotas.length).toFixed(2))
           : null;
 
-      const excedeFaltas = faltasTotales > maxAbsencesThreshold;
-
       let estadoAprobacion: 'Aprobado' | 'Regular' | 'En Riesgo' | 'Sin Notas' = 'Sin Notas';
-      if (promedio !== null) {
-        if (excedeFaltas || promedio < 4.0) {
-          estadoAprobacion = 'En Riesgo';
-        } else if (promedio >= 7.0) {
-          estadoAprobacion = 'Aprobado';
-        } else {
-          estadoAprobacion = 'Regular';
-        }
-      } else if (excedeFaltas) {
+      if (excedeFaltas) {
         estadoAprobacion = 'En Riesgo';
+      } else if (promedio !== null) {
+        if (promedio >= 7.0) estadoAprobacion = 'Aprobado';
+        else if (promedio >= 4.0) estadoAprobacion = 'Regular';
+        else estadoAprobacion = 'En Riesgo';
       }
 
       return {
@@ -461,7 +763,7 @@ export const SchoolProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         notas: studentNotas,
         faltasTotales,
         asistenciasTotales,
-        totalClasesRegistradas,
+        totalClasesRegistradas: totalClases,
         porcentajeAsistencia,
         excedeFaltas,
         estadoAprobacion,
@@ -483,8 +785,205 @@ export const SchoolProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     );
   }, [resumenAlumnos]);
 
-  // Clean Slate: Reset to 100% empty state (no courses, no students)
+  // --- BACKUPS & SNAPSHOTS ENGINE ---
+  const createBackup = (name?: string, isAuto: boolean = false): DatabaseBackup => {
+    const activeUsername = currentUser || 'admin';
+    const timestamp = new Date().toISOString();
+    const formattedDate = new Date().toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' });
+    const formattedTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+    const defaultName = isAuto
+      ? (name || `Auto-Respaldo (${formattedDate} ${formattedTime})`)
+      : (name || `Copia de Seguridad manual - ${formattedDate} ${formattedTime}`);
+
+    const newBackup: DatabaseBackup = {
+      id: 'backup-' + Date.now() + '-' + Math.random().toString(36).substring(2, 7),
+      name: defaultName,
+      timestamp,
+      username: activeUsername,
+      isAutoBackup: isAuto,
+      counts: {
+        grupos: grupos.length,
+        alumnos: alumnos.length,
+        asistencias: asistencias.length,
+        temarios: temarios.length,
+        desempenos: desempenos.length,
+        notas: notas.length,
+      },
+      data: {
+        grupos: JSON.parse(JSON.stringify(grupos)),
+        alumnos: JSON.parse(JSON.stringify(alumnos)),
+        asistencias: JSON.parse(JSON.stringify(asistencias)),
+        temarios: JSON.parse(JSON.stringify(temarios)),
+        desempenos: JSON.parse(JSON.stringify(desempenos)),
+        notas: JSON.parse(JSON.stringify(notas)),
+        maxAbsencesThreshold,
+        databaseUrl,
+      },
+    };
+
+    setBackups((prev) => [newBackup, ...prev.slice(0, 24)]); // Keep last 25 backups
+    if (!isAuto) {
+      setSystemNotice(`Copia de seguridad guardada: "${newBackup.name}" (${grupos.length} cursos, ${alumnos.length} estudiantes).`);
+    }
+    return newBackup;
+  };
+
+  const restoreBackup = (backupId: string): boolean => {
+    const target = backups.find((b) => b.id === backupId);
+    if (!target) return false;
+
+    // Create an automatic safety snapshot before restoring
+    createBackup(`Auto-Respaldo previo a restaurar (${target.name})`, true);
+
+    setGrupos(target.data.grupos || []);
+    setAlumnos(target.data.alumnos || []);
+    setAsistencias(target.data.asistencias || []);
+    setTemarios(target.data.temarios || []);
+    setDesempenos(target.data.desempenos || []);
+    setNotas(target.data.notas || []);
+    if (target.data.maxAbsencesThreshold) {
+      setMaxAbsencesThreshold(target.data.maxAbsencesThreshold);
+    }
+    if (target.data.databaseUrl !== undefined) {
+      setDatabaseUrl(target.data.databaseUrl);
+    }
+    setSelectedCursoId('all');
+    setSystemNotice(`Copia de seguridad "${target.name}" restaurada con éxito.`);
+    return true;
+  };
+
+  const deleteBackup = (backupId: string) => {
+    setBackups((prev) => prev.filter((b) => b.id !== backupId));
+    setSystemNotice('Copia de seguridad eliminada.');
+  };
+
+  const exportBackupJson = (backupId?: string) => {
+    let targetBackup: DatabaseBackup | undefined;
+    if (backupId) {
+      targetBackup = backups.find((b) => b.id === backupId);
+    } else {
+      targetBackup = createBackup(`Respaldo descargado ${new Date().toLocaleDateString()}`);
+    }
+    if (!targetBackup) return;
+
+    const payload = {
+      app: 'GestionEscolarIntegral',
+      version: '2.0',
+      exportedAt: new Date().toISOString(),
+      user: currentUser || 'admin',
+      backup: targetBackup,
+    };
+
+    const jsonStr = JSON.stringify(payload, null, 2);
+    const blob = new Blob([jsonStr], { type: 'application/json;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    const dateStamp = new Date().toISOString().split('T')[0];
+    const userStamp = (currentUser || 'admin').replace(/[^a-zA-Z0-9_-]/g, '_');
+    link.setAttribute('download', `Respaldo_Escolar_${userStamp}_${dateStamp}.json`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    setSystemNotice('Archivo JSON de respaldo descargado correctamente.');
+  };
+
+  const importBackupJson = (jsonString: string, mode: 'replace' | 'merge'): { success: boolean; message: string } => {
+    try {
+      const parsed = JSON.parse(jsonString);
+      const data = parsed.backup?.data || parsed.data || parsed;
+
+      if (!data || (!Array.isArray(data.grupos) && !Array.isArray(data.alumnos))) {
+        return { success: false, message: 'El archivo JSON no contiene una estructura válida de Gestión Escolar.' };
+      }
+
+      // Auto safety backup before import
+      createBackup('Auto-Respaldo previo a importar archivo', true);
+
+      if (mode === 'replace') {
+        setGrupos(data.grupos || []);
+        setAlumnos(data.alumnos || []);
+        setAsistencias(data.asistencias || []);
+        setTemarios(data.temarios || []);
+        setDesempenos(data.desempenos || []);
+        setNotas(data.notas || []);
+        if (data.maxAbsencesThreshold) setMaxAbsencesThreshold(data.maxAbsencesThreshold);
+        setSystemNotice('Base de datos restaurada completamente desde el archivo.');
+        return { success: true, message: 'Base de datos restaurada con éxito.' };
+      } else {
+        // Merge mode: append without destroying
+        const maxCursoId = grupos.length > 0 ? Math.max(...grupos.map((g) => g.id_curso)) : 0;
+        const maxAlumnoId = alumnos.length > 0 ? Math.max(...alumnos.map((a) => a.id_alumno)) : 0;
+        const maxTemarioId = temarios.length > 0 ? Math.max(...temarios.map((t) => t.id_temario)) : 0;
+        const maxNotaId = notas.length > 0 ? Math.max(...notas.map((n) => n.id_nota)) : 0;
+
+        const importedGrupos: Grupo[] = (data.grupos || []).map((g: Grupo) => ({
+          ...g,
+          id_curso: g.id_curso + maxCursoId,
+        }));
+
+        const cursoMap = new Map<number, number>();
+        (data.grupos || []).forEach((g: Grupo) => cursoMap.set(g.id_curso, g.id_curso + maxCursoId));
+
+        const importedAlumnos: Alumno[] = (data.alumnos || []).map((a: Alumno) => ({
+          ...a,
+          id_alumno: a.id_alumno + maxAlumnoId,
+          id_curso: a.id_curso ? cursoMap.get(a.id_curso) || a.id_curso + maxCursoId : null,
+        }));
+
+        const alumnoMap = new Map<number, number>();
+        (data.alumnos || []).forEach((a: Alumno) => alumnoMap.set(a.id_alumno, a.id_alumno + maxAlumnoId));
+
+        const importedAsistencias: Asistencia[] = (data.asistencias || []).map((asist: Asistencia) => ({
+          ...asist,
+          id_alumno: alumnoMap.get(asist.id_alumno) || asist.id_alumno + maxAlumnoId,
+        }));
+
+        const temarioMap = new Map<number, number>();
+        const importedTemarios: TemarioDia[] = (data.temarios || []).map((t: TemarioDia) => {
+          const newTid = t.id_temario + maxTemarioId;
+          temarioMap.set(t.id_temario, newTid);
+          return {
+            ...t,
+            id_temario: newTid,
+            id_curso: cursoMap.get(t.id_curso) || t.id_curso + maxCursoId,
+          };
+        });
+
+        const importedDesempenos: DesempenoClase[] = (data.desempenos || []).map((d: DesempenoClase) => ({
+          ...d,
+          id_temario: temarioMap.get(d.id_temario) || d.id_temario + maxTemarioId,
+          id_alumno: alumnoMap.get(d.id_alumno) || d.id_alumno + maxAlumnoId,
+        }));
+
+        const importedNotas: Nota[] = (data.notas || []).map((n: Nota) => ({
+          ...n,
+          id_nota: n.id_nota + maxNotaId,
+          id_alumno: alumnoMap.get(n.id_alumno) || n.id_alumno + maxAlumnoId,
+        }));
+
+        setGrupos((prev) => [...prev, ...importedGrupos]);
+        setAlumnos((prev) => [...prev, ...importedAlumnos]);
+        setAsistencias((prev) => [...prev, ...importedAsistencias]);
+        setTemarios((prev) => [...prev, ...importedTemarios]);
+        setDesempenos((prev) => [...prev, ...importedDesempenos]);
+        setNotas((prev) => [...prev, ...importedNotas]);
+
+        setSystemNotice(`Registros del archivo combinados exitosamente con tu base de datos.`);
+        return { success: true, message: 'Registros integrados sin borrar tus cursos ni estudiantes.' };
+      }
+    } catch (err: any) {
+      return { success: false, message: 'Error procesando archivo: ' + (err.message || 'Formato JSON incorrecto') };
+    }
+  };
+
+  // Clean Slate: Reset to empty state (with safety auto-backup!)
   const clearAllData = () => {
+    if (grupos.length > 0 || alumnos.length > 0) {
+      createBackup('Auto-Respaldo previo a vaciar base de datos', true);
+    }
     setGrupos([]);
     setAlumnos([]);
     setAsistencias([]);
@@ -493,28 +992,107 @@ export const SchoolProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     setNotas([]);
     setSelectedCursoId('all');
     setMaxAbsencesThreshold(5);
+    setSystemNotice('Base de datos vaciada. Se guardó una copia de respaldo automática previa.');
   };
 
-  // Optional: Load sample demo data for quick review
-  const loadDemoData = () => {
-    setGrupos(DEMO_GRUPOS);
-    setAlumnos(DEMO_ALUMNOS);
-    setAsistencias(DEMO_ASISTENCIAS);
-    setTemarios(DEMO_TEMARIOS);
-    setDesempenos(DEMO_DESEMPENOS);
-    setNotas(DEMO_NOTAS);
-    setSelectedCursoId('all');
-    setMaxAbsencesThreshold(5);
+  // SAFE DEMO DATA LOADING:
+  // "Que no se borren mis cursos o estudiantes, al presionar el botón de datos 'demo'"
+  const loadDemoData = (preserveExisting: boolean = true) => {
+    // 1. Always create an automatic safety backup first!
+    if (grupos.length > 0 || alumnos.length > 0) {
+      createBackup('Auto-Respaldo previo a cargar Demo', true);
+    }
+
+    if (!preserveExisting || (grupos.length === 0 && alumnos.length === 0)) {
+      setGrupos(DEMO_GRUPOS);
+      setAlumnos(DEMO_ALUMNOS);
+      setAsistencias(DEMO_ASISTENCIAS);
+      setTemarios(DEMO_TEMARIOS);
+      setDesempenos(DEMO_DESEMPENOS);
+      setNotas(DEMO_NOTAS);
+      setSelectedCursoId('all');
+      setMaxAbsencesThreshold(5);
+      setSystemNotice('Datos de demostración cargados en la plantilla.');
+      return;
+    }
+
+    // 2. Safely merge demo data into existing database WITHOUT DELETING OR OVERWRITING!
+    const maxCursoId = grupos.length > 0 ? Math.max(...grupos.map((g) => g.id_curso)) : 0;
+    const maxAlumnoId = alumnos.length > 0 ? Math.max(...alumnos.map((a) => a.id_alumno)) : 0;
+    const maxTemarioId = temarios.length > 0 ? Math.max(...temarios.map((t) => t.id_temario)) : 0;
+    const maxNotaId = notas.length > 0 ? Math.max(...notas.map((n) => n.id_nota)) : 0;
+
+    const cursoMap = new Map<number, number>();
+    const remappedGrupos: Grupo[] = DEMO_GRUPOS.map((dg) => {
+      const newCid = dg.id_curso + maxCursoId;
+      cursoMap.set(dg.id_curso, newCid);
+      const nameConflict = grupos.some((g) => g.nombre_curso.trim().toLowerCase() === dg.nombre_curso.trim().toLowerCase());
+      return {
+        ...dg,
+        id_curso: newCid,
+        nombre_curso: nameConflict ? `${dg.nombre_curso} (Demo)` : dg.nombre_curso,
+      };
+    });
+
+    const alumnoMap = new Map<number, number>();
+    const remappedAlumnos: Alumno[] = DEMO_ALUMNOS.map((da) => {
+      const newAid = da.id_alumno + maxAlumnoId;
+      alumnoMap.set(da.id_alumno, newAid);
+      return {
+        ...da,
+        id_alumno: newAid,
+        id_curso: da.id_curso ? cursoMap.get(da.id_curso) || da.id_curso + maxCursoId : null,
+      };
+    });
+
+    const remappedAsistencias: Asistencia[] = DEMO_ASISTENCIAS.map((das) => ({
+      ...das,
+      id_alumno: alumnoMap.get(das.id_alumno) || das.id_alumno + maxAlumnoId,
+    }));
+
+    const temarioMap = new Map<number, number>();
+    const remappedTemarios: TemarioDia[] = DEMO_TEMARIOS.map((dt) => {
+      const newTid = dt.id_temario + maxTemarioId;
+      temarioMap.set(dt.id_temario, newTid);
+      return {
+        ...dt,
+        id_temario: newTid,
+        id_curso: cursoMap.get(dt.id_curso) || dt.id_curso + maxCursoId,
+      };
+    });
+
+    const remappedDesempenos: DesempenoClase[] = DEMO_DESEMPENOS.map((dd) => ({
+      ...dd,
+      id_temario: temarioMap.get(dd.id_temario) || dd.id_temario + maxTemarioId,
+      id_alumno: alumnoMap.get(dd.id_alumno) || dd.id_alumno + maxAlumnoId,
+    }));
+
+    const remappedNotas: Nota[] = DEMO_NOTAS.map((dn) => ({
+      ...dn,
+      id_nota: dn.id_nota + maxNotaId,
+      id_alumno: alumnoMap.get(dn.id_alumno) || dn.id_alumno + maxAlumnoId,
+    }));
+
+    setGrupos((prev) => [...prev, ...remappedGrupos]);
+    setAlumnos((prev) => [...prev, ...remappedAlumnos]);
+    setAsistencias((prev) => [...prev, ...remappedAsistencias]);
+    setTemarios((prev) => [...prev, ...remappedTemarios]);
+    setDesempenos((prev) => [...prev, ...remappedDesempenos]);
+    setNotas((prev) => [...prev, ...remappedNotas]);
+
+    setSystemNotice(`¡Listo! Se agregaron 3 cursos y 11 alumnos demo sin borrar tus cursos y estudiantes existentes. Se guardó además un auto-respaldo previo.`);
   };
 
   const resetToDefaults = clearAllData;
 
-  // Generate full PostgreSQL DDL + optional data script
+  // Generate full PostgreSQL DDL + data script
   const generatePostgreSQLScript = (): string => {
     const hasData = grupos.length > 0 || alumnos.length > 0;
+    const activeUsername = currentUser || 'admin';
 
     return `-- ==========================================================
 -- GESTIÓN ESCOLAR INTEGRAL - ESQUEMA DE BASE DE DATOS POSTGRESQL
+-- Base de Datos del Usuario: ${activeUsername}
 -- Compatible con: Supabase, Neon, Vercel Postgres, PostgreSQL 14+
 -- Conexión Cloud: DATABASE_URL="postgresql://...sslmode=require"
 -- ==========================================================
@@ -531,8 +1109,7 @@ CREATE TABLE IF NOT EXISTS "Alumnos" (
     "id_alumno" SERIAL PRIMARY KEY,
     "nombre" VARCHAR(100) NOT NULL,
     "apellido" VARCHAR(100) NOT NULL,
-    "id_curso" INTEGER REFERENCES "Grupo"("id_curso") ON DELETE SET NULL,
-    "certificado" BOOLEAN DEFAULT false NOT NULL
+    "id_curso" INTEGER REFERENCES "Grupo"("id_curso") ON DELETE SET NULL
 );
 
 -- 3. TABLA: Asistencia (Control Diario de Presencias)
@@ -581,7 +1158,7 @@ CREATE INDEX IF NOT EXISTS "idx_notas_alumno" ON "Notas"("id_alumno");
 ${
   hasData
     ? `-- ==========================================================
--- INSERCIÓN DE DATOS REGISTRADOS EN EL SISTEMA
+-- INSERCIÓN DE DATOS REGISTRADOS EN EL SISTEMA (${activeUsername})
 -- ==========================================================
 
 -- Insertar Cursos / Grupos
@@ -596,7 +1173,7 @@ ${grupos
 ${alumnos
   .map(
     (a) =>
-      `INSERT INTO "Alumnos" ("id_alumno", "nombre", "apellido", "id_curso", "certificado") VALUES (${a.id_alumno}, '${a.nombre.replace(/'/g, "''")}', '${a.apellido.replace(/'/g, "''")}', ${a.id_curso ?? 'NULL'}, ${a.certificado}) ON CONFLICT ("id_alumno") DO UPDATE SET "nombre" = EXCLUDED."nombre", "apellido" = EXCLUDED."apellido", "id_curso" = EXCLUDED."id_curso", "certificado" = EXCLUDED."certificado";`
+      `INSERT INTO "Alumnos" ("id_alumno", "nombre", "apellido", "id_curso") VALUES (${a.id_alumno}, '${a.nombre.replace(/'/g, "''")}', '${a.apellido.replace(/'/g, "''")}', ${a.id_curso ?? 'NULL'}) ON CONFLICT ("id_alumno") DO UPDATE SET "nombre" = EXCLUDED."nombre", "apellido" = EXCLUDED."apellido", "id_curso" = EXCLUDED."id_curso";`
   )
   .join('\n')}
 
@@ -646,8 +1223,15 @@ ${notas
       value={{
         isAuthenticated,
         currentUser,
+        currentUserProfile,
+        isSuperAdmin,
+        users,
         login,
         logout,
+        registerUser,
+        updateUser,
+        deleteUser,
+        switchUser,
         databaseUrl,
         setDatabaseUrl,
         activeTab,
@@ -670,7 +1254,7 @@ ${notas
         addAlumno,
         updateAlumno,
         deleteAlumno,
-        toggleCertificado,
+        downloadStudentReport,
         setAsistencia,
         markBatchAsistencia,
         getAsistencia,
@@ -685,6 +1269,14 @@ ${notas
         resumenAlumnos,
         totalAlumnosEnRiesgo,
         promedioGeneralInstitucional,
+        backups,
+        createBackup,
+        restoreBackup,
+        deleteBackup,
+        exportBackupJson,
+        importBackupJson,
+        systemNotice,
+        setSystemNotice,
         clearAllData,
         loadDemoData,
         resetToDefaults,

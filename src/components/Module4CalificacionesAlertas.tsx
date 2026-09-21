@@ -14,6 +14,8 @@ import {
   X,
   AlertCircle,
   FileCheck,
+  FileDown,
+  FileText,
 } from 'lucide-react';
 
 export const Module4CalificacionesAlertas: React.FC = () => {
@@ -29,6 +31,7 @@ export const Module4CalificacionesAlertas: React.FC = () => {
     addNota,
     updateNota,
     deleteNota,
+    downloadStudentReport,
     selectedCursoId,
     setSelectedCursoId,
     setActiveTab,
@@ -358,7 +361,7 @@ export const Module4CalificacionesAlertas: React.FC = () => {
                     <th className="py-3 px-4">Curso / Asignatura</th>
                     <th className="py-3 px-4 text-center">Promedio General</th>
                     <th className="py-3 px-4 text-center">Inasistencias Acumuladas</th>
-                    <th className="py-3 px-4 text-center">Certificado</th>
+                    <th className="py-3 px-4 text-center">Informe PDF</th>
                     <th className="py-3 px-4 text-center">Sistema de Alerta</th>
                     <th className="py-3 px-4 text-right">Acción</th>
                   </tr>
@@ -469,18 +472,16 @@ export const Module4CalificacionesAlertas: React.FC = () => {
                           </div>
                         </td>
 
-                        {/* Certificado */}
+                        {/* INFORME PDF */}
                         <td className="py-3 px-4 text-center">
-                          {item.alumno.certificado ? (
-                            <span className="inline-flex items-center gap-1 text-[11px] text-emerald-700 font-semibold bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
-                              <CheckCircle2 className="w-3 h-3 text-emerald-600" />
-                              Entregado
-                            </span>
-                          ) : (
-                            <span className="inline-flex items-center gap-1 text-[11px] text-amber-700 font-semibold bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200">
-                              Pendiente
-                            </span>
-                          )}
+                          <button
+                            onClick={() => downloadStudentReport(item.alumno.id_alumno)}
+                            className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold bg-blue-50 text-blue-700 hover:bg-blue-100 rounded-xl border border-blue-200 transition-colors shadow-2xs cursor-pointer"
+                            title={`Descargar informe académico oficial en PDF de ${item.alumno.nombre} ${item.alumno.apellido}`}
+                          >
+                            <FileDown className="w-3.5 h-3.5 text-blue-600" />
+                            <span>Descargar</span>
+                          </button>
                         </td>
 
                         {/* ALERTA VISUAL AUTOMÁTICA */}

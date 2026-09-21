@@ -32,17 +32,17 @@ export const DEMO_GRUPOS: Grupo[] = [
 ];
 
 export const DEMO_ALUMNOS: Alumno[] = [
-  { id_alumno: 1, nombre: 'Mateo', apellido: 'Fernández', id_curso: 1, certificado: true },
-  { id_alumno: 2, nombre: 'Sofía', apellido: 'Gómez', id_curso: 1, certificado: true },
-  { id_alumno: 3, nombre: 'Lucas', apellido: 'Herrera', id_curso: 1, certificado: false },
-  { id_alumno: 4, nombre: 'Camila', apellido: 'Vargas', id_curso: 1, certificado: true },
-  { id_alumno: 5, nombre: 'Nicolás', apellido: 'Rojas', id_curso: 1, certificado: false },
-  { id_alumno: 6, nombre: 'Valentina', apellido: 'Silva', id_curso: 2, certificado: true },
-  { id_alumno: 7, nombre: 'Joaquín', apellido: 'Castillo', id_curso: 2, certificado: true },
-  { id_alumno: 8, nombre: 'Martina', apellido: 'Pérez', id_curso: 2, certificado: false },
-  { id_alumno: 9, nombre: 'Diego', apellido: 'Morales', id_curso: 2, certificado: true },
-  { id_alumno: 10, nombre: 'Agustín', apellido: 'Romero', id_curso: 3, certificado: true },
-  { id_alumno: 11, nombre: 'Lucía', apellido: 'Torres', id_curso: 3, certificado: false },
+  { id_alumno: 1, nombre: 'Mateo', apellido: 'Fernández', id_curso: 1 },
+  { id_alumno: 2, nombre: 'Sofía', apellido: 'Gómez', id_curso: 1 },
+  { id_alumno: 3, nombre: 'Lucas', apellido: 'Herrera', id_curso: 1 },
+  { id_alumno: 4, nombre: 'Camila', apellido: 'Vargas', id_curso: 1 },
+  { id_alumno: 5, nombre: 'Nicolás', apellido: 'Rojas', id_curso: 1 },
+  { id_alumno: 6, nombre: 'Valentina', apellido: 'Silva', id_curso: 2 },
+  { id_alumno: 7, nombre: 'Joaquín', apellido: 'Castillo', id_curso: 2 },
+  { id_alumno: 8, nombre: 'Martina', apellido: 'Pérez', id_curso: 2 },
+  { id_alumno: 9, nombre: 'Diego', apellido: 'Morales', id_curso: 2 },
+  { id_alumno: 10, nombre: 'Agustín', apellido: 'Romero', id_curso: 3 },
+  { id_alumno: 11, nombre: 'Lucía', apellido: 'Torres', id_curso: 3 },
 ];
 
 export const DEMO_ASISTENCIAS: Asistencia[] = [

@@ -1,1 +1,317 @@
 @import "tailwindcss";
+
+/* ==========================================================================
+   GLOBAL THEME ENGINE FOR GESTIÓN ESCOLAR
+   ========================================================================== */
+
+/* 1. MINIMALISTA SWISS / APPLE CLEAN */
+[data-theme="minimal_white"] {
+  --app-bg: #f8fafc;
+}
+[data-theme="minimal_white"] body,
+[data-theme="minimal_white"] .min-h-screen {
+  background-color: #f8fafc !important;
+}
+[data-theme="minimal_white"] .bg-white {
+  background-color: #ffffff !important;
+  border-color: #e4e4e7 !important;
+}
+[data-theme="minimal_white"] .bg-blue-600 {
+  background-color: #18181b !important;
+}
+[data-theme="minimal_white"] .hover\:bg-blue-500:hover,
+[data-theme="minimal_white"] .hover\:bg-blue-700:hover {
+  background-color: #27272a !important;
+}
+[data-theme="minimal_white"] .text-blue-600,
+[data-theme="minimal_white"] .text-blue-700 {
+  color: #18181b !important;
+}
+[data-theme="minimal_white"] .bg-blue-50 {
+  background-color: #f4f4f5 !important;
+  color: #09090b !important;
+}
+
+/* 2. MIDNIGHT OLED / DEEP DARK */
+[data-theme="midnight_dark"] {
+  color-scheme: dark;
+}
+[data-theme="midnight_dark"] body,
+[data-theme="midnight_dark"] .min-h-screen {
+  background-color: #090d16 !important;
+  color: #f1f5f9 !important;
+}
+[data-theme="midnight_dark"] nav.bg-white {
+  background-color: #0d1322 !important;
+  border-color: #1e293b !important;
+}
+[data-theme="midnight_dark"] nav .text-slate-600 {
+  color: #94a3b8 !important;
+}
+[data-theme="midnight_dark"] nav .hover\:bg-slate-100\/80:hover {
+  background-color: #1e293b !important;
+  color: #f8fafc !important;
+}
+[data-theme="midnight_dark"] nav .bg-blue-50 {
+  background-color: #1e293b !important;
+  color: #60a5fa !important;
+  border-color: #3b82f6 !important;
+}
+[data-theme="midnight_dark"] .bg-white {
+  background-color: #111827 !important;
+  border-color: #1f2937 !important;
+  color: #f1f5f9 !important;
+}
+[data-theme="midnight_dark"] .bg-slate-50,
+[data-theme="midnight_dark"] .bg-slate-100,
+[data-theme="midnight_dark"] .bg-slate-100\/60 {
+  background-color: #161f30 !important;
+}
+[data-theme="midnight_dark"] .border-slate-200,
+[data-theme="midnight_dark"] .border-slate-200\/80,
+[data-theme="midnight_dark"] .border-slate-100 {
+  border-color: #1f2937 !important;
+}
+[data-theme="midnight_dark"] .text-slate-900,
+[data-theme="midnight_dark"] .text-slate-800 {
+  color: #f8fafc !important;
+}
+[data-theme="midnight_dark"] .text-slate-700,
+[data-theme="midnight_dark"] .text-slate-600 {
+  color: #cbd5e1 !important;
+}
+[data-theme="midnight_dark"] .text-slate-500,
+[data-theme="midnight_dark"] .text-slate-400 {
+  color: #94a3b8 !important;
+}
+[data-theme="midnight_dark"] input,
+[data-theme="midnight_dark"] select,
+[data-theme="midnight_dark"] textarea {
+  background-color: #0b0f19 !important;
+  color: #f8fafc !important;
+  border-color: #334155 !important;
+}
+[data-theme="midnight_dark"] footer.bg-white {
+  background-color: #0b0f19 !important;
+  border-color: #1e293b !important;
+  color: #64748b !important;
+}
+
+/* 3. CYBERPUNK TECH / NEON DARK */
+[data-theme="cyber_neon"] {
+  color-scheme: dark;
+}
+[data-theme="cyber_neon"] body,
+[data-theme="cyber_neon"] .min-h-screen {
+  background-color: #030712 !important;
+  color: #e0f2fe !important;
+}
+[data-theme="cyber_neon"] nav.bg-white {
+  background-color: #080f1e !important;
+  border-color: #0e7490 !important;
+}
+[data-theme="cyber_neon"] nav .bg-blue-50 {
+  background-color: #083344 !important;
+  color: #22d3ee !important;
+  border-color: #06b6d4 !important;
+  box-shadow: 0 0 12px rgba(6, 182, 212, 0.25) !important;
+}
+[data-theme="cyber_neon"] .bg-white {
+  background-color: #090e1a !important;
+  border-color: #164e63 !important;
+  color: #f0fdfa !important;
+}
+[data-theme="cyber_neon"] .bg-slate-50,
+[data-theme="cyber_neon"] .bg-slate-100 {
+  background-color: #0c1527 !important;
+}
+[data-theme="cyber_neon"] .border-slate-200,
+[data-theme="cyber_neon"] .border-slate-100 {
+  border-color: #155e75 !important;
+}
+[data-theme="cyber_neon"] .text-slate-900,
+[data-theme="cyber_neon"] .text-slate-800 {
+  color: #f8fafc !important;
+}
+[data-theme="cyber_neon"] .text-slate-700,
+[data-theme="cyber_neon"] .text-slate-600 {
+  color: #a5f3fc !important;
+}
+[data-theme="cyber_neon"] .text-slate-500,
+[data-theme="cyber_neon"] .text-slate-400 {
+  color: #67e8f9 !important;
+}
+[data-theme="cyber_neon"] .bg-blue-600 {
+  background-color: #0891b2 !important;
+}
+[data-theme="cyber_neon"] .hover\:bg-blue-500:hover {
+  background-color: #06b6d4 !important;
+}
+[data-theme="cyber_neon"] input,
+[data-theme="cyber_neon"] select,
+[data-theme="cyber_neon"] textarea {
+  background-color: #030712 !important;
+  color: #f8fafc !important;
+  border-color: #0891b2 !important;
+}
+[data-theme="cyber_neon"] footer.bg-white {
+  background-color: #030712 !important;
+  border-color: #155e75 !important;
+  color: #67e8f9 !important;
+}
+
+/* 4. VERDE CAMPUS / BOTANICAL ACADEMIC */
+[data-theme="emerald_campus"] body,
+[data-theme="emerald_campus"] .min-h-screen {
+  background-color: #f0fdf4 !important;
+}
+[data-theme="emerald_campus"] nav.bg-white {
+  background-color: #ffffff !important;
+  border-color: #bbf7d0 !important;
+}
+[data-theme="emerald_campus"] nav .bg-blue-50 {
+  background-color: #dcfce7 !important;
+  color: #15803d !important;
+  border-color: #86efac !important;
+}
+[data-theme="emerald_campus"] nav .text-blue-600 {
+  color: #16a34a !important;
+}
+[data-theme="emerald_campus"] .bg-white {
+  border-color: #dcfce7 !important;
+}
+[data-theme="emerald_campus"] .bg-blue-600 {
+  background-color: #059669 !important;
+}
+[data-theme="emerald_campus"] .hover\:bg-blue-500:hover,
+[data-theme="emerald_campus"] .hover\:bg-blue-700:hover {
+  background-color: #047857 !important;
+}
+[data-theme="emerald_campus"] .text-blue-600,
+[data-theme="emerald_campus"] .text-blue-700,
+[data-theme="emerald_campus"] .text-indigo-600 {
+  color: #059669 !important;
+}
+[data-theme="emerald_campus"] .bg-blue-50,
+[data-theme="emerald_campus"] .bg-indigo-50 {
+  background-color: #ecfdf5 !important;
+  color: #065f46 !important;
+}
+
+/* 5. CÁLIDO TERRACOTA / SUNSET AMBER */
+[data-theme="sunset_amber"] body,
+[data-theme="sunset_amber"] .min-h-screen {
+  background-color: #fffdf5 !important;
+}
+[data-theme="sunset_amber"] nav.bg-white {
+  background-color: #ffffff !important;
+  border-color: #fde68a !important;
+}
+[data-theme="sunset_amber"] nav .bg-blue-50 {
+  background-color: #fef3c7 !important;
+  color: #b45309 !important;
+  border-color: #fcd34d !important;
+}
+[data-theme="sunset_amber"] nav .text-blue-600 {
+  color: #d97706 !important;
+}
+[data-theme="sunset_amber"] .bg-white {
+  border-color: #fef3c7 !important;
+}
+[data-theme="sunset_amber"] .bg-blue-600 {
+  background-color: #d97706 !important;
+}
+[data-theme="sunset_amber"] .hover\:bg-blue-500:hover,
+[data-theme="sunset_amber"] .hover\:bg-blue-700:hover {
+  background-color: #b45309 !important;
+}
+[data-theme="sunset_amber"] .text-blue-600,
+[data-theme="sunset_amber"] .text-blue-700,
+[data-theme="sunset_amber"] .text-indigo-600 {
+  color: #d97706 !important;
+}
+[data-theme="sunset_amber"] .bg-blue-50,
+[data-theme="sunset_amber"] .bg-indigo-50 {
+  background-color: #fffbeb !important;
+  color: #92400e !important;
+}
+
+/* 6. PÚRPURA VELVET / ROYAL INDIGO */
+[data-theme="royal_purple"] body,
+[data-theme="royal_purple"] .min-h-screen {
+  background-color: #faf5ff !important;
+}
+[data-theme="royal_purple"] nav.bg-white {
+  background-color: #ffffff !important;
+  border-color: #e9d5ff !important;
+}
+[data-theme="royal_purple"] nav .bg-blue-50 {
+  background-color: #f3e8ff !important;
+  color: #7e22ce !important;
+  border-color: #d8b4fe !important;
+}
+[data-theme="royal_purple"] nav .text-blue-600 {
+  color: #7c3aed !important;
+}
+[data-theme="royal_purple"] .bg-white {
+  border-color: #f3e8ff !important;
+}
+[data-theme="royal_purple"] .bg-blue-600 {
+  background-color: #7c3aed !important;
+}
+[data-theme="royal_purple"] .hover\:bg-blue-500:hover,
+[data-theme="royal_purple"] .hover\:bg-blue-700:hover {
+  background-color: #6d28d9 !important;
+}
+[data-theme="royal_purple"] .text-blue-600,
+[data-theme="royal_purple"] .text-blue-700,
+[data-theme="royal_purple"] .text-indigo-600 {
+  color: #7c3aed !important;
+}
+[data-theme="royal_purple"] .bg-blue-50,
+[data-theme="royal_purple"] .bg-indigo-50 {
+  background-color: #faf5ff !important;
+  color: #581c87 !important;
+}
+
+/* 7. ALTO CONTRASTE B&W (WCAG AAA) */
+[data-theme="high_contrast"] body,
+[data-theme="high_contrast"] .min-h-screen {
+  background-color: #ffffff !important;
+  color: #000000 !important;
+}
+[data-theme="high_contrast"] .bg-white {
+  background-color: #ffffff !important;
+  border: 2px solid #000000 !important;
+  box-shadow: none !important;
+}
+[data-theme="high_contrast"] nav.bg-white {
+  border-bottom: 2px solid #000000 !important;
+}
+[data-theme="high_contrast"] nav .bg-blue-50 {
+  background-color: #000000 !important;
+  color: #ffffff !important;
+  border: 2px solid #000000 !important;
+}
+[data-theme="high_contrast"] nav .bg-blue-50 * {
+  color: #ffffff !important;
+}
+[data-theme="high_contrast"] .bg-blue-600 {
+  background-color: #000000 !important;
+  color: #ffffff !important;
+  border: 2px solid #000000 !important;
+}
+[data-theme="high_contrast"] .hover\:bg-blue-500:hover,
+[data-theme="high_contrast"] .hover\:bg-blue-700:hover {
+  background-color: #262626 !important;
+}
+[data-theme="high_contrast"] input,
+[data-theme="high_contrast"] select,
+[data-theme="high_contrast"] textarea {
+  border: 2px solid #000000 !important;
+  color: #000000 !important;
+}
+[data-theme="high_contrast"] .border-slate-200,
+[data-theme="high_contrast"] .border-slate-100 {
+  border-color: #000000 !important;
+}

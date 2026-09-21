@@ -1,5 +1,6 @@
 import React from 'react';
 import { SchoolProvider, useSchool } from './context/SchoolContext';
+import { ThemeProvider, useTheme } from './context/ThemeContext';
 import { LoginView } from './components/LoginView';
 import { Header } from './components/Header';
 import { Navigation } from './components/Navigation';
@@ -8,6 +9,8 @@ import { Module2Asistencia } from './components/Module2Asistencia';
 import { Module3TemarioDesempeno } from './components/Module3TemarioDesempeno';
 import { Module4CalificacionesAlertas } from './components/Module4CalificacionesAlertas';
 import { ModuleSqlExport } from './components/ModuleSqlExport';
+import { Module5BackupsUsuarios } from './components/Module5BackupsUsuarios';
+import { CheckCircle2, AlertCircle } from 'lucide-react';
 
 const MainContent: React.FC = () => {
   const { activeTab } = useSchool();
@@ -19,21 +22,44 @@ const MainContent: React.FC = () => {
       {activeTab === 'temario_desempeno' && <Module3TemarioDesempeno />}
       {activeTab === 'calificaciones_alertas' && <Module4CalificacionesAlertas />}
       {activeTab === 'sql_export' && <ModuleSqlExport />}
+      {activeTab === 'backups_usuarios' && <Module5BackupsUsuarios />}
     </main>
   );
 };
 
 const SchoolApp: React.FC = () => {
-  const { isAuthenticated } = useSchool();
+  const { isAuthenticated, systemNotice, setSystemNotice } = useSchool();
+  const { currentTheme } = useTheme();
 
   if (!isAuthenticated) {
     return <LoginView />;
   }
 
   return (
-    <div className="min-h-screen bg-slate-100/60 text-slate-800 flex flex-col font-sans selection:bg-blue-500 selection:text-white antialiased">
+    <div
+      data-theme={currentTheme}
+      className="min-h-screen bg-slate-100/60 text-slate-800 flex flex-col font-sans selection:bg-blue-500 selection:text-white antialiased relative transition-colors duration-150"
+    >
       <Header />
       <Navigation />
+
+      {/* Global System Notice Toast */}
+      {systemNotice && (
+        <div className="fixed bottom-5 right-5 z-50 max-w-md bg-slate-900 text-white px-4 py-3 rounded-xl shadow-2xl border border-slate-700 flex items-start gap-3 animate-fadeIn">
+          <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0 mt-0.5" />
+          <div className="text-xs flex-1">
+            <p className="font-semibold text-slate-200">Notificación del Sistema</p>
+            <p className="text-slate-300/90 mt-0.5">{systemNotice}</p>
+          </div>
+          <button
+            onClick={() => setSystemNotice(null)}
+            className="text-slate-400 hover:text-white text-sm leading-none ml-2"
+          >
+            ✕
+          </button>
+        </div>
+      )}
+
       <div className="flex-1">
         <MainContent />
       </div>
@@ -53,8 +79,10 @@ const SchoolApp: React.FC = () => {
 
 export default function App() {
   return (
-    <SchoolProvider>
-      <SchoolApp />
-    </SchoolProvider>
+    <ThemeProvider>
+      <SchoolProvider>
+        <SchoolApp />
+      </SchoolProvider>
+    </ThemeProvider>
   );
 }

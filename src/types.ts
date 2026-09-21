@@ -15,7 +15,7 @@ export interface Alumno {
   nombre: string; // VARCHAR, Obligatorio
   apellido: string; // VARCHAR, Obligatorio
   id_curso: number | null; // FK hacia Grupo, Opcional/Nullable
-  certificado: boolean; // BOOLEAN / TINYINT, por defecto false
+  certificado?: boolean; // Obsoleto (reemplazado por Informe Académico PDF)
 }
 
 // 3. Asistencia (Control Diario)
@@ -54,7 +54,52 @@ export interface Nota {
 }
 
 // UI Navigation Tabs
-export type TabKey = 'cursos_alumnos' | 'asistencia' | 'temario_desempeno' | 'calificaciones_alertas' | 'sql_export';
+export type TabKey =
+  | 'cursos_alumnos'
+  | 'asistencia'
+  | 'temario_desempeno'
+  | 'calificaciones_alertas'
+  | 'sql_export'
+  | 'backups_usuarios';
+
+// Administrator User Profile for Multi-User Management
+export type UserRole = 'SuperAdmin' | 'Administrador' | 'Docente';
+
+export interface AdminUser {
+  id: string;
+  username: string;
+  password: string;
+  nombre: string;
+  rol: UserRole;
+  createdAt: string;
+}
+
+// Database Snapshot / Backup for Recovery
+export interface DatabaseBackup {
+  id: string;
+  name: string;
+  timestamp: string;
+  username: string;
+  isAutoBackup?: boolean;
+  counts: {
+    grupos: number;
+    alumnos: number;
+    asistencias: number;
+    temarios: number;
+    desempenos: number;
+    notas: number;
+  };
+  data: {
+    grupos: Grupo[];
+    alumnos: Alumno[];
+    asistencias: Asistencia[];
+    temarios: TemarioDia[];
+    desempenos: DesempenoClase[];
+    notas: Nota[];
+    maxAbsencesThreshold: number;
+    databaseUrl?: string;
+  };
+}
 
 // Dynamic Student Academic Summary
 export interface ResumenAlumno {
@@ -69,4 +114,32 @@ export interface ResumenAlumno {
   porcentajeAsistencia: number;
   excedeFaltas: boolean;
   estadoAprobacion: 'Aprobado' | 'Regular' | 'En Riesgo' | 'Sin Notas';
+}
+
+// UI Theme Styles
+export type ThemeId =
+  | 'classic_slate'
+  | 'minimal_white'
+  | 'midnight_dark'
+  | 'cyber_neon'
+  | 'emerald_campus'
+  | 'sunset_amber'
+  | 'royal_purple'
+  | 'high_contrast';
+
+export interface ThemeConfig {
+  id: ThemeId;
+  name: string;
+  tagline: string;
+  category: 'Clásico' | 'Modo Oscuro' | 'Colorido' | 'Accesibilidad';
+  isDark: boolean;
+  palette: {
+    primary: string;
+    secondary: string;
+    accent: string;
+    background: string;
+    card: string;
+    border: string;
+    text: string;
+  };
 }

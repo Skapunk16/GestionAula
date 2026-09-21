@@ -339,11 +339,6 @@ export const Module2Asistencia: React.FC = () => {
                           <span>
                             {alumno.apellido}, {alumno.nombre}
                           </span>
-                          {!alumno.certificado && (
-                            <span className="ml-2 text-[10px] text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200">
-                              Doc. Pendiente
-                            </span>
-                          )}
                         </div>
                       </div>
                     </td>

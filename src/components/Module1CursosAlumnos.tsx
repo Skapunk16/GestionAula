@@ -8,11 +8,11 @@ import {
   Edit2,
   Trash2,
   Search,
-  CheckCircle,
-  Clock,
   Check,
   X,
   AlertCircle,
+  FileDown,
+  FileText,
 } from 'lucide-react';
 
 export const Module1CursosAlumnos: React.FC = () => {
@@ -25,14 +25,13 @@ export const Module1CursosAlumnos: React.FC = () => {
     addAlumno,
     updateAlumno,
     deleteAlumno,
-    toggleCertificado,
+    downloadStudentReport,
     selectedCursoId,
     setSelectedCursoId,
   } = useSchool();
 
-  // Search & Filter
+  // Search
   const [searchQuery, setSearchQuery] = useState('');
-  const [filterCertificado, setFilterCertificado] = useState<'all' | 'true' | 'false'>('all');
 
   // Modal / Form state for Grupo
   const [isGrupoModalOpen, setIsGrupoModalOpen] = useState(false);
@@ -47,12 +46,10 @@ export const Module1CursosAlumnos: React.FC = () => {
     nombre: string;
     apellido: string;
     id_curso: number | '';
-    certificado: boolean;
   }>({
     nombre: '',
     apellido: '',
     id_curso: '',
-    certificado: false,
   });
   const [alumnoError, setAlumnoError] = useState('');
 
@@ -81,7 +78,6 @@ export const Module1CursosAlumnos: React.FC = () => {
       setGrupoError('El nombre del curso es obligatorio');
       return;
     }
-
     if (editingGrupo) {
       updateGrupo(editingGrupo.id_curso, grupoForm.nombre_curso, grupoForm.descripcion);
     } else {
@@ -97,7 +93,6 @@ export const Module1CursosAlumnos: React.FC = () => {
       nombre: '',
       apellido: '',
       id_curso: selectedCursoId === 'all' ? (grupos[0]?.id_curso || '') : selectedCursoId,
-      certificado: false,
     });
     setAlumnoError('');
     setIsAlumnoModalOpen(true);
@@ -109,7 +104,6 @@ export const Module1CursosAlumnos: React.FC = () => {
       nombre: alumno.nombre,
       apellido: alumno.apellido,
       id_curso: alumno.id_curso ?? '',
-      certificado: alumno.certificado,
     });
     setAlumnoError('');
     setIsAlumnoModalOpen(true);
@@ -129,11 +123,10 @@ export const Module1CursosAlumnos: React.FC = () => {
         editingAlumno.id_alumno,
         alumnoForm.nombre,
         alumnoForm.apellido,
-        cursoIdValue,
-        alumnoForm.certificado
+        cursoIdValue
       );
     } else {
-      addAlumno(alumnoForm.nombre, alumnoForm.apellido, cursoIdValue, alumnoForm.certificado);
+      addAlumno(alumnoForm.nombre, alumnoForm.apellido, cursoIdValue);
     }
     setIsAlumnoModalOpen(false);
   };
@@ -145,12 +138,8 @@ export const Module1CursosAlumnos: React.FC = () => {
     const matchesQuery =
       `${alumno.nombre} ${alumno.apellido}`.toLowerCase().includes(searchQuery.toLowerCase()) ||
       alumno.id_alumno.toString() === searchQuery.trim();
-    const matchesCertificado =
-      filterCertificado === 'all' ||
-      (filterCertificado === 'true' && alumno.certificado) ||
-      (filterCertificado === 'false' && !alumno.certificado);
 
-    return matchesCurso && matchesQuery && matchesCertificado;
+    return matchesCurso && matchesQuery;
   });
 
   return (
@@ -326,7 +315,7 @@ export const Module1CursosAlumnos: React.FC = () => {
               Nómina Oficial de Estudiantes ({filteredAlumnos.length} de {alumnos.length})
             </h3>
             <span className="text-xs text-slate-500">
-              Tabla relacional: <code className="text-xs bg-slate-100 px-1.5 py-0.5 rounded text-slate-700 font-mono">Alumnos (id_alumno, nombre, apellido, id_curso, certificado)</code>
+              Tabla relacional: <code className="text-xs bg-slate-100 px-1.5 py-0.5 rounded text-slate-700 font-mono">Alumnos (id_alumno, nombre, apellido, id_curso)</code>
             </span>
           </div>
 
@@ -367,17 +356,6 @@ export const Module1CursosAlumnos: React.FC = () => {
                 </option>
               ))}
             </select>
-
-            {/* Certificate Filter */}
-            <select
-              value={filterCertificado}
-              onChange={(e) => setFilterCertificado(e.target.value as any)}
-              className="text-xs py-1.5 px-3 bg-white border border-slate-300 rounded-xl text-slate-700 focus:outline-none focus:border-blue-500"
-            >
-              <option value="all">Certificados: Todos</option>
-              <option value="true">Entregado</option>
-              <option value="false">Pendiente</option>
-            </select>
           </div>
         </div>
 
@@ -390,7 +368,7 @@ export const Module1CursosAlumnos: React.FC = () => {
                   <th className="py-3 px-4 w-16 text-center">ID</th>
                   <th className="py-3 px-4">Estudiante (Nombre y Apellido)</th>
                   <th className="py-3 px-4">Curso / Asignatura Asignada</th>
-                  <th className="py-3 px-4 text-center">Certificado de Admisión</th>
+                  <th className="py-3 px-4 text-center">Informe del Estudiante</th>
                   <th className="py-3 px-4 text-right">Acciones</th>
                 </tr>
               </thead>
@@ -460,28 +438,15 @@ export const Module1CursosAlumnos: React.FC = () => {
                           )}
                         </td>
 
-                        {/* Certificado Toggle */}
+                        {/* Informe del Estudiante PDF */}
                         <td className="py-3 px-4 text-center">
                           <button
-                            onClick={() => toggleCertificado(alumno.id_alumno)}
-                            className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold transition-colors ${
-                              alumno.certificado
-                                ? 'bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100'
-                                : 'bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100'
-                            }`}
-                            title="Click para cambiar estado de entrega"
+                            onClick={() => downloadStudentReport(alumno.id_alumno)}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100 hover:border-blue-300 transition-colors shadow-2xs cursor-pointer"
+                            title="Generar y descargar Informe Académico Oficial en PDF"
                           >
-                            {alumno.certificado ? (
-                              <>
-                                <CheckCircle className="w-3.5 h-3.5 text-emerald-600" />
-                                Entregado
-                              </>
-                            ) : (
-                              <>
-                                <Clock className="w-3.5 h-3.5 text-amber-600" />
-                                Pendiente
-                              </>
-                            )}
+                            <FileDown className="w-3.5 h-3.5 text-blue-600" />
+                            <span>Descargar PDF</span>
                           </button>
                         </td>
 
@@ -489,15 +454,22 @@ export const Module1CursosAlumnos: React.FC = () => {
                         <td className="py-3 px-4 text-right">
                           <div className="flex items-center justify-end gap-1">
                             <button
+                              onClick={() => downloadStudentReport(alumno.id_alumno)}
+                              className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors cursor-pointer"
+                              title="Descargar informe oficial en PDF"
+                            >
+                              <FileText className="w-4 h-4" />
+                            </button>
+                            <button
                               onClick={() => handleOpenEditAlumno(alumno)}
-                              className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                              className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors cursor-pointer"
                               title="Editar alumno"
                             >
                               <Edit2 className="w-4 h-4" />
                             </button>
                             <button
                               onClick={() => setConfirmDeleteAlumnoId(alumno.id_alumno)}
-                              className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
+                              className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
                               title="Eliminar alumno"
                             >
                               <Trash2 className="w-4 h-4" />
@@ -692,25 +664,12 @@ export const Module1CursosAlumnos: React.FC = () => {
                 </select>
               </div>
 
-              <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl">
-                <label className="flex items-center gap-3 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={alumnoForm.certificado}
-                    onChange={(e) =>
-                      setAlumnoForm({ ...alumnoForm, certificado: e.target.checked })
-                    }
-                    className="w-4 h-4 text-blue-600 rounded border-slate-300 focus:ring-blue-500"
-                  />
-                  <div>
-                    <span className="text-xs font-semibold text-slate-800 block">
-                      Certificado de Admisión / Escolar Entregado
-                    </span>
-                    <span className="text-[11px] text-slate-500 block">
-                      Marcar si el estudiante ya presentó la documentación técnica requerida.
-                    </span>
-                  </div>
-                </label>
+              <div className="p-3 bg-blue-50/70 border border-blue-200 rounded-xl flex items-start gap-2.5">
+                <FileText className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
+                <div className="text-[11px] text-blue-900 leading-relaxed">
+                  <span className="font-semibold block text-blue-950">Informe Académico Oficial en PDF</span>
+                  El sistema generará el informe descargable con todas las calificaciones, asistencias y seguimiento temático del estudiante.
+                </div>
               </div>
 
               <div className="flex justify-end gap-2 pt-2">

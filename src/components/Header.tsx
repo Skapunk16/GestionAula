@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 import { useSchool } from '../context/SchoolContext';
+import { useTheme } from '../context/ThemeContext';
+import { ThemeSelectorModal } from './ThemeSelectorModal';
 import {
   GraduationCap,
   Users,
@@ -13,6 +15,7 @@ import {
   ShieldCheck,
   Trash2,
   Sparkles,
+  Palette,
 } from 'lucide-react';
 
 export const Header: React.FC = () => {
@@ -27,11 +30,16 @@ export const Header: React.FC = () => {
     loadDemoData,
     setActiveTab,
     currentUser,
+    currentUserProfile,
+    isSuperAdmin,
     logout,
   } = useSchool();
 
+  const { themeConfig } = useTheme();
+
   const [showConfig, setShowConfig] = useState(false);
   const [showDataMenu, setShowDataMenu] = useState(false);
+  const [showThemeModal, setShowThemeModal] = useState(false);
 
   return (
     <header className="bg-slate-900 text-slate-100 border-b border-slate-800 sticky top-0 z-30 shadow-md">
@@ -140,6 +148,41 @@ export const Header: React.FC = () => {
               )}
             </div>
 
+            {/* Theme Selector Button */}
+            <button
+              onClick={() => setShowThemeModal(true)}
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-indigo-950/60 hover:bg-indigo-900/80 border border-indigo-700/60 text-indigo-200 transition-colors cursor-pointer"
+              title={`Estilo visual: ${themeConfig.name}. Clic para cambiar el tema de la interfaz.`}
+            >
+              <Palette className="w-3.5 h-3.5 text-indigo-400" />
+              <span className="hidden sm:inline text-xs font-medium">Temas</span>
+              <span
+                className="w-2.5 h-2.5 rounded-full border border-white/40 shadow-xs"
+                style={{ backgroundColor: themeConfig.palette.primary }}
+              />
+            </button>
+
+            {/* Backups & Multi-User Tab Shortcut (Both SuperAdmin and Docentes) */}
+            {isSuperAdmin ? (
+              <button
+                onClick={() => setActiveTab('backups_usuarios')}
+                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-emerald-950/60 hover:bg-emerald-900/60 border border-emerald-700/50 text-emerald-200 transition-colors cursor-pointer"
+                title="Panel de administración de usuarios y copias de seguridad"
+              >
+                <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+                <span className="hidden sm:inline">Panel SuperAdmin</span>
+              </button>
+            ) : (
+              <button
+                onClick={() => setActiveTab('backups_usuarios')}
+                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-emerald-950/60 hover:bg-emerald-900/60 border border-emerald-700/50 text-emerald-200 transition-colors cursor-pointer"
+                title="Generar y restaurar copias de seguridad de tus cursos y alumnos"
+              >
+                <Database className="w-3.5 h-3.5 text-emerald-400" />
+                <span className="hidden sm:inline">Mis Respaldos</span>
+              </button>
+            )}
+
             {/* SQL Export Tab Shortcut */}
             <button
               onClick={() => setActiveTab('sql_export')}
@@ -150,56 +193,65 @@ export const Header: React.FC = () => {
               <span className="hidden sm:inline">Esquema SQL</span>
             </button>
 
-            {/* Data Management (Empty State vs Demo) */}
+            {/* Data Management (Safe Demo & Backups) */}
             <div className="relative">
               <button
                 onClick={() => setShowDataMenu(!showDataMenu)}
-                className="flex items-center gap-1.5 px-2 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 transition-colors"
-                title="Gestión del estado de datos (Vaciar o Demo)"
+                className="flex items-center gap-1.5 px-2 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 transition-colors cursor-pointer"
+                title="Gestión del estado de datos (Demo no destructiva o Limpiar)"
               >
                 <RotateCcw className="w-3.5 h-3.5 text-slate-400" />
                 <span className="hidden lg:inline">Datos</span>
               </button>
 
               {showDataMenu && (
-                <div className="absolute right-0 mt-2 w-64 p-3 bg-slate-800 border border-slate-700 rounded-xl shadow-2xl z-40 text-slate-200 space-y-2">
+                <div className="absolute right-0 mt-2 w-72 p-3 bg-slate-800 border border-slate-700 rounded-xl shadow-2xl z-40 text-slate-200 space-y-2">
                   <p className="font-semibold text-xs text-white">Gestión de la Base de Datos</p>
                   <p className="text-[11px] text-slate-400">
-                    Control de plantilla vacía institucional y pruebas:
+                    Espacio del usuario: <strong className="text-white">@{currentUser}</strong> ({currentUserProfile?.rol || 'Docente'})
                   </p>
                   
+                  <button
+                    onClick={() => {
+                      loadDemoData(true);
+                      setShowDataMenu(false);
+                    }}
+                    className="w-full flex items-center gap-2 px-2.5 py-2 rounded-lg bg-slate-900/80 hover:bg-blue-950/80 border border-slate-700 hover:border-blue-600/60 text-blue-300 text-xs transition-colors cursor-pointer"
+                  >
+                    <Sparkles className="w-3.5 h-3.5 text-blue-400 shrink-0" />
+                    <div className="text-left">
+                      <p className="font-semibold leading-tight">Anexar Datos Demo</p>
+                      <p className="text-[10px] text-slate-400">Mantiene tus cursos y alumnos intactos</p>
+                    </div>
+                  </button>
+
                   <button
                     onClick={() => {
                       clearAllData();
                       setShowDataMenu(false);
                     }}
-                    className="w-full flex items-center gap-2 px-2.5 py-2 rounded-lg bg-slate-900/80 hover:bg-rose-950/80 border border-slate-700 hover:border-rose-600/60 text-rose-300 text-xs transition-colors"
+                    className="w-full flex items-center gap-2 px-2.5 py-2 rounded-lg bg-slate-900/80 hover:bg-rose-950/80 border border-slate-700 hover:border-rose-600/60 text-rose-300 text-xs transition-colors cursor-pointer"
                   >
                     <Trash2 className="w-3.5 h-3.5 text-rose-400 shrink-0" />
                     <div className="text-left">
-                      <p className="font-semibold leading-tight">Vaciar todo (Plantilla Limpia)</p>
-                      <p className="text-[10px] text-slate-400">0 cursos, 0 alumnos, tablas limpias</p>
+                      <p className="font-semibold leading-tight">Vaciar Base de Datos</p>
+                      <p className="text-[10px] text-slate-400">Guarda un auto-respaldo previo por seguridad</p>
                     </div>
                   </button>
 
-                  <button
-                    onClick={() => {
-                      loadDemoData();
-                      setShowDataMenu(false);
-                    }}
-                    className="w-full flex items-center gap-2 px-2.5 py-2 rounded-lg bg-slate-900/80 hover:bg-blue-950/80 border border-slate-700 hover:border-blue-600/60 text-blue-300 text-xs transition-colors"
-                  >
-                    <Sparkles className="w-3.5 h-3.5 text-blue-400 shrink-0" />
-                    <div className="text-left">
-                      <p className="font-semibold leading-tight">Cargar Datos Demo</p>
-                      <p className="text-[10px] text-slate-400">Cargar ejemplos para demostración</p>
-                    </div>
-                  </button>
-
-                  <div className="pt-1 flex justify-end">
+                  <div className="pt-2 border-t border-slate-700/80 flex items-center justify-between text-xs">
+                    <button
+                      onClick={() => {
+                        setActiveTab('backups_usuarios');
+                        setShowDataMenu(false);
+                      }}
+                      className="text-indigo-400 hover:text-indigo-300 font-medium cursor-pointer"
+                    >
+                      {isSuperAdmin ? 'Panel de Usuarios / Backups →' : 'Mis Copias de Seguridad (Backups) →'}
+                    </button>
                     <button
                       onClick={() => setShowDataMenu(false)}
-                      className="px-2 py-0.5 text-xs text-slate-400 hover:text-white"
+                      className="px-2 py-0.5 text-xs text-slate-400 hover:text-white cursor-pointer"
                     >
                       Cerrar
                     </button>
@@ -208,16 +260,38 @@ export const Header: React.FC = () => {
               )}
             </div>
 
-            {/* Admin User Info & Logout Button */}
+            {/* User Info & Switcher & Logout */}
             <div className="flex items-center gap-1.5 pl-1.5 border-l border-slate-700/80">
-              <div className="hidden xl:flex items-center gap-1 px-2 py-1 rounded bg-slate-800 text-[11px] text-slate-300 border border-slate-700/70">
-                <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
-                <span>{currentUser || 'admin'}</span>
-              </div>
+              {isSuperAdmin ? (
+                <button
+                  onClick={() => setActiveTab('backups_usuarios')}
+                  className="hidden xl:flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-emerald-950/40 hover:bg-emerald-900/50 text-[11px] text-slate-200 border border-emerald-700/60 transition-colors cursor-pointer"
+                  title="Administrador General (SuperAdmin): Clic para abrir el panel de administración de usuarios"
+                >
+                  <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+                  <span className="font-medium text-white">{currentUserProfile?.nombre || currentUser || 'admin'}</span>
+                  <span className="px-1.5 py-0.5 rounded text-[10px] bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/30">
+                    SuperAdmin
+                  </span>
+                </button>
+              ) : (
+                <button
+                  onClick={() => setActiveTab('backups_usuarios')}
+                  className="hidden xl:flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-[11px] text-slate-300 border border-slate-700/70 transition-colors cursor-pointer"
+                  title={`Usuario: ${currentUserProfile?.nombre || currentUser} (Rol: ${currentUserProfile?.rol || 'Docente'}). Clic para ver tus respaldos.`}
+                >
+                  <BookOpen className="w-3.5 h-3.5 text-blue-400" />
+                  <span className="font-medium text-white">{currentUserProfile?.nombre || currentUser}</span>
+                  <span className="px-1.5 py-0.5 rounded text-[10px] bg-blue-500/20 text-blue-300 font-bold border border-blue-500/30">
+                    {currentUserProfile?.rol || 'Docente'}
+                  </span>
+                </button>
+              )}
+
               <button
                 onClick={logout}
-                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-rose-950/40 hover:bg-rose-900/60 border border-rose-800/40 text-rose-300 hover:text-rose-100 transition-colors"
-                title="Cerrar sesión de administrador"
+                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-rose-950/40 hover:bg-rose-900/60 border border-rose-800/40 text-rose-300 hover:text-rose-100 transition-colors cursor-pointer"
+                title="Cerrar sesión"
               >
                 <LogOut className="w-3.5 h-3.5" />
                 <span className="hidden sm:inline">Cerrar Sesión</span>
@@ -228,6 +302,12 @@ export const Header: React.FC = () => {
 
         </div>
       </div>
+
+      {/* Theme Selector Modal */}
+      <ThemeSelectorModal
+        isOpen={showThemeModal}
+        onClose={() => setShowThemeModal(false)}
+      />
     </header>
   );
 };
